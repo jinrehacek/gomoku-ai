@@ -10,17 +10,5 @@ dependencies = ["rich"]
 [project.optional-dependencies]
 dev = ["pytest", "ruff"]
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+[tool.ruff]
+lint.ignore = ["F841"]
