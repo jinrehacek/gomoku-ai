@@ -12,3 +12,4 @@ dev = ["pytest", "ruff"]
 
 [tool.ruff]
 lint.ignore = ["F841"]
+line-length = 128

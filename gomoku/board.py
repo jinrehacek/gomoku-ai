@@ -1,18 +1,24 @@
+# Default values for the Board
+WHITE_TURN, BLACK_TURN = 0, 1
 WHITE_STONE, BLACK_STONE = 1, 2
 SIZE = 15
+WIN_LEN = 5
 
 
 class Board:
-    def __init__(self, size=SIZE) -> None:
+    def __init__(self, size=SIZE, win_len=WIN_LEN) -> None:
         self.data = [[0 for _ in range(size)] for _ in range(size)]
         # 0 = na tahu bily; 1 = na tahu cerny
         self.turn = 0
         self.LENGTH = size
+        self.WINNING_LENGTH = win_len
 
-    def place(self, x, y, player=None):
-        # if player is not None:
-        #     self.turn = player # dovoli na pripadne upravit, kdo je na tahu
-
+    def place(self, x, y):
+        """
+        beware - parameters are not intuitive
+        x = row
+        y = column
+        """
         if self.data[x][y] != 0:
             raise Exception("Placing stone on already occupied square!")
         else:
@@ -24,7 +30,7 @@ class Board:
         sada = [".", "O", "X"]
         for i in range(self.LENGTH):
             line = self.data[i]
-            a = [sada[i] for i in line]
+            a = [sada[j] for j in line]
             print("".join(a))
 
     def is_full(self):
@@ -34,12 +40,14 @@ class Board:
                     return False
         return True
 
-    def check_line(self, inp_line: list[int]) -> int:
+    def check_line(self, inp_line: list[int], IN_ROW=None) -> int:
+        if IN_ROW is None:
+            IN_ROW = self.WINNING_LENGTH
         size = len(inp_line)
         line = inp_line + [0, 0]
         together = 0
         for i in range(size + 1):
-            if together == 5 and line[i] != line[i - 1]:
+            if together == IN_ROW and line[i] != line[i - 1]:
                 return line[i - 1]
 
             if i == 0 and line[i]:
@@ -58,25 +66,21 @@ class Board:
         2: black won
         3: board is full, nobody won
         """
-
-        if self.is_full():
-            return 3
-        ### TO FIX vvv !!!!!
-        # diagonaly chceme jen s dostatencym poctem prvku - tj aspon 5
-        for start in range(4, self.LENGTH):
+        # DIAGONALS /
+        diagonal_starts = [(x, 0) for x in range(self.WINNING_LENGTH - 1, self.LENGTH)] + [
+            (self.LENGTH - 1, x) for x in range(0, self.LENGTH - self.WINNING_LENGTH + 1)
+        ]
+        for x, y in diagonal_starts:
             line = []
-            x, y = start, 0
-            while True:
+            while y < self.LENGTH:
                 line.append(self.data[x][y])
-                if y == start:
-                    break
                 y, x = y + 1, x - 1
             a = self.check_line(line)
             if a > 0:
                 return a
 
-        # DIAGONALS \
-        for start in range(0, self.LENGTH - 4):  # nevim jestli -3 je spravne
+        # DIAGONALS \ (small but negligible redundancy)
+        for start in range(0, self.LENGTH - self.WINNING_LENGTH + 1):
             x, y = 0, start
             line1, line2 = [], []
             while x < self.LENGTH and y < self.LENGTH:
@@ -94,11 +98,15 @@ class Board:
             if a > 0:
                 return a
 
-        # COLLUMNS
+        # COLUMNS
         for i in range(self.LENGTH):
             line = [self.data[x][i] for x in range(self.LENGTH)]
             a = self.check_line(line)
             if a > 0:
                 return a
+
+        # check as last thing (highly unlikely to happen in game)
+        if self.is_full():
+            return 3
 
         return 0
