@@ -7,6 +7,10 @@ WIN_LEN = 5
 
 class Board:
     def __init__(self, size=SIZE, win_len=WIN_LEN) -> None:
+        """
+        default size = 15; WIN_LEN = 5
+        .data = 2D array (array of rows)
+        """
         self.data = [[0 for _ in range(size)] for _ in range(size)]
         # 0 = na tahu bily; 1 = na tahu cerny
         self.turn = 0
@@ -31,9 +35,12 @@ class Board:
         for i in range(self.LENGTH):
             line = self.data[i]
             a = [sada[j] for j in line]
-            print("".join(a))
+            print(" ".join(a))  # space so its more square-ish
 
-    def is_full(self):
+    def is_full(self) -> bool:
+        """
+        returns True when stone in every square
+        """
         for x in range(self.LENGTH):
             for y in range(self.LENGTH):
                 if self.data[x][y] == 0:
@@ -41,6 +48,12 @@ class Board:
         return True
 
     def check_line(self, inp_line: list[int], IN_ROW=None) -> int:
+        """
+        checks if there is a win in given line (row, col, diagonal)
+        0: no win
+        1: white won
+        2: black won
+        """
         if IN_ROW is None:
             IN_ROW = self.WINNING_LENGTH
         size = len(inp_line)

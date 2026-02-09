@@ -20,3 +20,6 @@ minimax + alpha/beta
 ## OPENING
 hardcoded strategie pro swap 2 a jinak nechat jet engine, pro vybrani strany, heuristicky nikdy nedame druhy swap
 
+
+## testing
+nainstaloat a pouzit nejaky package pak na zjisteni test coverage
