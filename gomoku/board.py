@@ -27,8 +27,19 @@ class Board:
             raise Exception("Placing stone on already occupied square!")
         else:
             self.data[x][y] = self.turn + 1
+            self.turn ^= 1  # obrati hodnotu turn
 
-        self.turn ^= 1  # obrati hodnotu turn
+    def remove_stone(self, x, y):
+        """
+        remove (preferably last placed) stone from board
+        flips self.turn
+        errors when trying to remove nothing
+        """
+        if self.data[x][y] == 0:
+            raise Exception("Cannot remove stone from empty square!")
+        else:
+            self.data[x][y] = 0
+            self.turn ^= 1
 
     def dev_print(self):
         sada = [".", "O", "X"]

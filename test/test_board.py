@@ -50,6 +50,19 @@ def test_place_exception(small_b43):
     assert "already occupied" in str(exc.value)
 
 
+def test_remove_stone(small_b43):
+    with pytest.raises(Exception) as exc:
+        small_b43.remove_stone(2, 1)
+    assert "empty square" in str(exc.value)
+
+    small_b43.place(2, 1)
+    assert small_b43.data[2][1] == WHITE_STONE
+    assert small_b43.turn == BLACK_TURN
+    small_b43.remove_stone(2, 1)
+    assert small_b43.data[2][1] == 0
+    assert small_b43.turn == WHITE_TURN
+
+
 def test_checkline(small_b43):
     assert small_b43.check_line([1, 1, 1, 1]) == NO_WIN
     assert small_b43.check_line([1, 1, 1, 0]) == WHITE_WON
