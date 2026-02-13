@@ -63,6 +63,9 @@ def test_remove_stone(small_b43):
     assert small_b43.turn == WHITE_TURN
 
 
+# TODO: Add test for undo_move()
+
+
 def test_checkline(small_b43):
     assert small_b43.check_line([1, 1, 1, 1]) == NO_WIN
     assert small_b43.check_line([1, 1, 1, 0]) == WHITE_WON
@@ -86,6 +89,9 @@ def test_is_full(small_b43):
 
     b.place(3, 2)
     assert b.is_full()
+
+
+# TODO: add tests for generators and _get_all_lines()
 
 
 def test_is_over_row(small_b43):

@@ -11,5 +11,5 @@ dependencies = ["rich"]
 dev = ["pytest", "ruff"]
 
 [tool.ruff]
-lint.ignore = ["F841"]
+lint.ignore = ["F841", "E701", "E702"]
 line-length = 128
