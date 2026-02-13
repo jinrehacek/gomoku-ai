@@ -40,8 +40,21 @@ SEARCH_PATTERNS = [
 ]
 
 
+def shortest_pattern(patterns: list[tuple[int, tuple]]) -> int:
+    """
+    returns int of length of shortest search pattern
+    """
+    lenghts = [len(x[1]) for x in patterns]
+    return min(lenghts)
+
+
 def prepare_patterns(patterns):
-    out: list[tuple[int, tuple[int]]] = []
+    """
+    Adds mirror images of patterns and then all patterns from perspective of black player
+    """
+    out: list[tuple[int, tuple]] = []
+
+    # Adding mirror images of patterns
     for pat in patterns:
         val, stones = pat
         rev = tuple([i for i in reversed(stones)])
@@ -50,14 +63,19 @@ def prepare_patterns(patterns):
         else:
             out.append(pat)
             out.append((val, rev))
+
+    # Adding corresponding patterns for black with negative val
+    for i in range(len(out)):
+        val, stones = out[i]
+        black_stones = tuple([(x % 2) + 1 if x else 0 for x in stones])
+        out.append((-val, black_stones))
+
     return out
 
 
-# NOTE: do eval board nezapomenout dat min pattern legnth
-# TEST: napsat pro tenhle shit testy
-def eval_line(line: list[int], patterns: list[tuple[int, tuple[int]]], shortest_pat: int) -> int:
+def eval_line(line: list[int], patterns: list[tuple[int, tuple]], shortest_pat: int) -> int:
     """
-    eval je z perspektivy bileho (+ kdyz vyhrav; - kdyz vyhrava cerny)
+    eval je z perspektivy bileho (+ kdyz vyhrava; - kdyz vyhrava cerny)
     """
     suma = 0
     for i in range(len(line) - shortest_pat + 1):
@@ -70,10 +88,18 @@ def eval_line(line: list[int], patterns: list[tuple[int, tuple[int]]], shortest_
 
             # napr pro i = 0 a len_pat = 4: 0 1 2 3
             window = tuple(line[i : i + len_pat])
-            black_stones = tuple([(x % 2) + 1 if x else 0 for x in stones])
 
+            # pro patterns z pohledu cerneho je hodnota zaporna
             if window == stones:
                 suma += val
-            elif window == black_stones:
-                suma -= val
+    return suma
+
+
+def eval_board(board: Board, patterns: list[tuple[int, tuple]], shortest_pat=None) -> int:
+    if shortest_pat is None:
+        shortest_pat = shortest_pattern(patterns)
+
+    suma = 0
+    for line in board._get_all_lines():
+        suma += eval_line(line, patterns, shortest_pat)
     return suma
