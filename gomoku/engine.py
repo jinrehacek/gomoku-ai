@@ -103,3 +103,66 @@ def eval_board(board: Board, patterns: list[tuple[int, tuple]], shortest_pat=Non
     for line in board._get_all_lines():
         suma += eval_line(line, patterns, shortest_pat)
     return suma
+
+
+SHORTEST = shortest_pattern(SEARCH_PATTERNS)
+COMPLETE_PATTERNS = prepare_patterns(SEARCH_PATTERNS)
+
+
+def heuristic_eval(board: Board) -> int:
+    return eval_board(board, COMPLETE_PATTERNS, SHORTEST)
+
+
+WIN_CONSTANT = 99999999
+
+
+def minimax(board: Board, depth: int, player: int) -> int | float:
+    """
+    MAX = 0, bily neb se zvysujici se eval_line vyhrava bily vice
+    MIN = 1, cerny
+    """
+    if depth == 0:
+        return heuristic_eval(board)
+
+    situtation = board.is_over()
+    if situtation > 0:
+        a = situtation % 3
+        a = -1 if a == 2 else a
+        return a * WIN_CONSTANT  # mega velke cislo ktere prebije cokoliv jineho co je realen mozne dostat evaluaci herni plochy
+
+    possible_moves = get_candidate_moves(board=board, distance=2)
+    best_eval = float("inf") * (-1 if player == 0 else 1)
+
+    for move in possible_moves:
+        board.place(*move)
+        evaluation = minimax(board, player=player ^ 1, depth=depth - 1)
+
+        # cleanign the board
+        board.remove_stone(*move)
+        if player == 0:
+            best_eval = max(best_eval, evaluation)
+        else:
+            best_eval = min(best_eval, evaluation)
+
+    return best_eval
+
+
+def get_best_move(board: Board, player: int, depth: int) -> tuple[int, int]:
+    best_eval = float("inf") * (-1 if player == 0 else 1)
+    possible_moves = get_candidate_moves(board=board, distance=2)
+    best_move = None
+
+    for move in possible_moves:
+        board.place(*move)
+        evaluation = minimax(board, player=player ^ 1, depth=depth - 1)
+
+        board.remove_stone(*move)
+
+        if player == 0:
+            if evaluation > best_eval:
+                best_eval, best_move = evaluation, move
+        else:
+            if evaluation < best_eval:
+                best_eval, best_move = evaluation, move
+    assert type(best_move) is tuple
+    return best_move
