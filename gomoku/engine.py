@@ -95,6 +95,11 @@ def eval_line(line: list[int], patterns: list[tuple[int, tuple]], shortest_pat: 
     return suma
 
 
+SHORTEST: int = shortest_pattern(SEARCH_PATTERNS)
+COMPLETE_PATTERNS = prepare_patterns(SEARCH_PATTERNS)
+WIN_CONSTANT: int = 99999999
+
+
 def eval_board(board: Board, patterns: list[tuple[int, tuple]], shortest_pat=None) -> int:
     if shortest_pat is None:
         shortest_pat = shortest_pattern(patterns)
@@ -105,30 +110,20 @@ def eval_board(board: Board, patterns: list[tuple[int, tuple]], shortest_pat=Non
     return suma
 
 
-SHORTEST = shortest_pattern(SEARCH_PATTERNS)
-COMPLETE_PATTERNS = prepare_patterns(SEARCH_PATTERNS)
-
-
-def heuristic_eval(board: Board) -> int:
-    return eval_board(board, COMPLETE_PATTERNS, SHORTEST)
-
-
-WIN_CONSTANT = 99999999
-
-
 def minimax(board: Board, depth: int, player: int) -> int | float:
     """
     MAX = 0, bily neb se zvysujici se eval_line vyhrava bily vice
     MIN = 1, cerny
     """
-    if depth == 0:
-        return heuristic_eval(board)
 
     situtation = board.is_over()
     if situtation > 0:
         a = situtation % 3
         a = -1 if a == 2 else a
         return a * WIN_CONSTANT  # mega velke cislo ktere prebije cokoliv jineho co je realen mozne dostat evaluaci herni plochy
+
+    if depth == 0:
+        return eval_board(board=board, patterns=COMPLETE_PATTERNS, shortest_pat=SHORTEST)
 
     possible_moves = get_candidate_moves(board=board, distance=2)
     best_eval = float("inf") * (-1 if player == 0 else 1)

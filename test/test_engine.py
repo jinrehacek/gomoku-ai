@@ -1,6 +1,18 @@
 import pytest
 from gomoku.board import Board
-from gomoku.engine import get_candidate_moves, _immediate_neighbors, eval_line, prepare_patterns, shortest_pattern, eval_board
+from gomoku.engine import (
+    get_candidate_moves,
+    _immediate_neighbors,
+    eval_line,
+    prepare_patterns,
+    shortest_pattern,
+    eval_board,
+    minimax,
+    get_best_move,
+    COMPLETE_PATTERNS,
+    SHORTEST,
+    WIN_CONSTANT,
+)
 
 
 def test_get_immediate_neighbors():
@@ -98,7 +110,7 @@ def test_eval_board():
 
     b = Board(size=4, win_len=3)
     b.data[0] = [0, 1, 1, 0]
-    assert eval_board(b, patterns, sp) == 20  # 10 + 10
+    assert eval_board(b, patterns) == 20  # 10 + 10
 
     b = Board(size=5, win_len=3)
     b.data[0] = [1, 1, 0, 0, 0]
@@ -122,3 +134,56 @@ def test_eval_board():
     b.data[2][0] = 1
     b.data[1][1] = 1
     assert eval_board(b, patterns, sp) == 10
+
+
+def test_minimax_zero_depth():
+    b = Board(size=5, win_len=4)
+    b.data[0] = [1, 1, 0, 0, 0]
+
+    # je stejne jako eval_board - aka jede jen heuristika
+    expected = eval_board(b, COMPLETE_PATTERNS, SHORTEST)
+    assert minimax(b, depth=0, player=0) == expected
+    assert minimax(b, depth=0, player=1) == expected
+
+
+def test_minimax_white_wins():
+    b = Board(size=7, win_len=5)
+    for i in range(5):
+        b.data[0][i] = 1
+    assert minimax(b, depth=1, player=1) == WIN_CONSTANT
+
+
+def test_minimax_black_wins():
+    b = Board(size=7, win_len=5)
+    for i in range(5):
+        b.data[0][i] = 2
+    assert minimax(b, depth=1, player=0) == -WIN_CONSTANT
+
+
+def test_minimax_draw():
+    b = Board(size=2, win_len=5)
+    b.data[0] = [1, 2]
+    b.data[1] = [2, 1]
+    assert minimax(b, depth=1, player=0) == 0
+
+
+def test_best_move_white():
+    b = Board(size=7, win_len=5)
+    b.data[0] = [1, 1, 1, 1, 0, 0, 0]
+    assert get_best_move(b, player=0, depth=2) == (0, 4)
+
+
+def test_best_move_black():
+    b = Board(size=7, win_len=5)
+    b.data[0] = [2, 2, 2, 2, 0, 0, 0]
+    b.turn = 1
+    assert get_best_move(b, player=1, depth=2) == (0, 4)
+
+
+def test_best_move_outs_candidate_move():
+    b = Board(size=5, win_len=5)
+    b.place(2, 2)
+    b.place(1, 2)
+    move = get_best_move(b, player=0, depth=1)
+    candidates = set(get_candidate_moves(b, distance=2))
+    assert move in candidates
