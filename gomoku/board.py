@@ -4,6 +4,8 @@ WHITE_STONE, BLACK_STONE = 1, 2
 SIZE = 15
 WIN_LEN = 5
 
+Coord = tuple[int, int]
+
 
 class Board:
     def __init__(self, size=SIZE, win_len=WIN_LEN) -> None:
@@ -17,7 +19,7 @@ class Board:
         self.LENGTH = size
         self.WINNING_LENGTH = win_len
         # Coords of last placed stone
-        self.last_placed = None
+        self.history: list[Coord] = []
 
     def place(self, x: int, y: int):
         """
@@ -30,7 +32,7 @@ class Board:
         else:
             self.data[x][y] = self.turn + 1
             self.turn ^= 1  # obrati hodnotu turn
-            self.last_placed = (x, y)
+            self.history.append((x, y))
 
     def remove_stone(self, x, y):
         """
@@ -44,20 +46,19 @@ class Board:
             self.data[x][y] = 0
             self.turn ^= 1
 
-    # func is unnecessray  - I think #F00
-    # def undo_move(self):
-    #     if self.last_placed is None:
-    #         raise Exception("No move has been played!")
-    #     else:
-    #         x, y = self.last_placed
-    #         self.remove_stone(x, y)
+    def undo_move(self):
+        if len(self.history) == 0:
+            raise Exception("No move has been played!")
+        else:
+            x, y = self.history.pop()
+            self.remove_stone(x, y)
 
-    def dev_print(self):
-        sada = [".", "O", "X"]
-        for i in range(self.LENGTH):
-            line = self.data[i]
-            a = [sada[j] for j in line]
-            print(" ".join(a))  # space so its more square-ish
+    # def dev_print(self):
+    #     sada = [".", "O", "X"]
+    #     for i in range(self.LENGTH):
+    #         line = self.data[i]
+    #         a = [sada[j] for j in line]
+    #         print(" ".join(a))  # space so its more square-ish
 
     def is_full(self) -> bool:
         """
@@ -138,7 +139,6 @@ class Board:
         yield from self._get_all_rows()
         yield from self._get_all_diagonals(min_pattern_len)
 
-    # TODO: Refactor this shit so it checks just the lines with self.last_placed
     def is_over(self) -> int:
         """
         0: game is not over
@@ -146,44 +146,53 @@ class Board:
         2: black won
         3: board is full, nobody won
         """
-        # DIAGONALS /
-        diagonal_starts = [(x, 0) for x in range(self.WINNING_LENGTH - 1, self.LENGTH)] + [
-            (self.LENGTH - 1, y) for y in range(0, self.LENGTH - self.WINNING_LENGTH + 1)
-        ]
-        for x, y in diagonal_starts:
-            line = []
-            while y < self.LENGTH and x >= 0:
-                line.append(self.data[x][y])
-                y, x = y + 1, x - 1
-            a = self.check_line(line)
-            if a > 0:
-                return a
 
-        # DIAGONALS \ (small but negligible redundancy)
-        for start in range(0, self.LENGTH - self.WINNING_LENGTH + 1):
-            x, y = 0, start
-            line1, line2 = [], []
-            while x < self.LENGTH and y < self.LENGTH:
-                line1.append(self.data[x][y])
-                line2.append(self.data[y][x])
-                x, y = x + 1, y + 1
-            a, b = self.check_line(line1), self.check_line(line2)
-            for answer in [a, b]:
-                if answer:
-                    return answer
+        if len(self.history) == 0:
+            for line in self._get_all_lines(min_pattern_len=self.WINNING_LENGTH):
+                state = self.check_line(line, IN_ROW=self.WINNING_LENGTH)
+                if state > 0:
+                    return state
+            if self.is_full():
+                return 3
+            return 0
+
+        lx, ly = self.history[-1]
 
         # ROWS
-        for row in self.data:
-            a = self.check_line(row)
-            if a > 0:
-                return a
+        state = self.check_line(self.data[lx])
+        if state > 0:
+            return state
 
         # COLUMNS
-        for i in range(self.LENGTH):
-            line = [self.data[x][i] for x in range(self.LENGTH)]
-            a = self.check_line(line)
-            if a > 0:
-                return a
+        line = [self.data[x][ly] for x in range(self.LENGTH)]
+        state = self.check_line(line)
+        if state > 0:
+            return state
+
+        # DIAGONAL \
+        posun = min(lx, ly)
+        diag: list[int] = []
+        x, y = lx - posun, ly - posun
+        while x < self.LENGTH and y < self.LENGTH:
+            diag.append(self.data[x][y])
+            x, y = x + 1, y + 1
+        state = self.check_line(diag)
+        if state > 0:
+            return state
+
+        # DIAGONAL /
+        diag = []
+        x, y = lx, ly
+        while x + 1 < self.LENGTH and y - 1 >= 0:
+            x, y = x + 1, y - 1
+
+        while x >= 0 and y < self.LENGTH:
+            diag.append(self.data[x][y])
+            x, y = x - 1, y + 1
+
+        state = self.check_line(diag)
+        if state > 0:
+            return state
 
         # check as last thing (highly unlikely to happen in game)
         if self.is_full():

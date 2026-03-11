@@ -1,5 +1,5 @@
 # tady bude zit logika enginu ktery budu jenom importovat do nejspis IO.py
-from gomoku.board import Board
+from gomoku.board import Board, Coord
 import time
 
 
@@ -14,16 +14,17 @@ def _immediate_neighbors(x, y, distance: int, board_size: int):
                 yield (n_x, n_y)
 
 
-def get_candidate_moves(board: Board, distance: int) -> list[tuple[int, int]]:
+def get_candidate_moves(board: Board, distance: int) -> list[Coord]:
     n = board.LENGTH
     # using sets for O(1) checking if coordinates are occupied or already in *out*
     # subject to change if candidate move order is needed
     occupied = set()
     out = set()
-    for i in range(n):
-        for j in range(n):
-            if board.data[i][j] > 0:
-                occupied.add((i, j))
+
+    # saves time cuz we have all placed stones here
+    for x, y in board.history:
+        occupied.add((x, y))
+
     for x, y in occupied:
         for i, j in _immediate_neighbors(x, y, distance, n):
             if (i, j) not in out and (i, j) not in occupied:
@@ -133,12 +134,22 @@ def minimax(board: Board, depth: int, player: int, alpha=float("-inf"), beta=flo
 
     possible_moves = get_candidate_moves(board=board, distance=2)
 
-    for move in possible_moves:
+    ann_moves: list[tuple[int, Coord]] = []
+    if len(board.history) > 0:
+        lx, ly = board.history[-1]
+        ann_moves = [(max(abs(lx - x), abs(ly - y)), (x, y)) for x, y in possible_moves]
+        ann_moves.sort(key=lambda x: x[0])
+
+    if len(ann_moves) == 0:
+        ann_moves = [(0, move) for move in possible_moves]
+
+    for a_move in ann_moves:
+        move = a_move[1]
         board.place(*move)
         evaluation = minimax(board, player=player ^ 1, depth=depth - 1, alpha=alpha, beta=beta)
 
         # cleanign the board
-        board.remove_stone(*move)
+        board.undo_move()
 
         if player == 0:
             # MAX
@@ -154,29 +165,34 @@ def minimax(board: Board, depth: int, player: int, alpha=float("-inf"), beta=flo
     return alpha if player == 0 else beta
 
 
-def get_best_move(board: Board, player: int, depth: int) -> tuple[int, int]:
+def get_best_move(board: Board, player: int, depth: int) -> Coord:
     best_eval = float("inf") * (-1 if player == 0 else 1)
     possible_moves = get_candidate_moves(board=board, distance=2)
     best_move = None
+    our_alpha = float("-inf")
+    our_beta = float("+inf")
 
     for move in possible_moves:
         board.place(*move)
         # we dont pass alpha/beta cuz its the start, we have no values
-        evaluation = minimax(board, player=player ^ 1, depth=depth - 1)
+        evaluation = minimax(board, player=player ^ 1, depth=depth - 1, alpha=our_alpha, beta=our_beta)
 
-        board.remove_stone(*move)
+        board.undo_move()
 
         if player == 0:
             if evaluation > best_eval:
                 best_eval, best_move = evaluation, move
+            our_alpha = max(best_eval, our_alpha)
         else:
             if evaluation < best_eval:
                 best_eval, best_move = evaluation, move
+            our_beta = min(best_eval, our_beta)
+
     assert type(best_move) is tuple
     return best_move
 
 
-def iterative_deepening(board: Board, player: int, given_time: int = 10) -> tuple[int, int]:
+def iterative_deepening(board: Board, player: int, given_time: int = 10) -> Coord:
     """
     given_time: time to spend in SECONDS
     returns the best move found in the time
