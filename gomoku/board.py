@@ -19,7 +19,7 @@ class Board:
         # Coords of last placed stone
         self.last_placed = None
 
-    def place(self, x, y):
+    def place(self, x: int, y: int):
         """
         beware - parameters are not intuitive
         x = row
