@@ -1,5 +1,6 @@
 # tady bude zit logika enginu ktery budu jenom importovat do nejspis IO.py
 from gomoku.board import Board
+import time
 
 
 def _immediate_neighbors(x, y, distance: int, board_size: int):
@@ -110,8 +111,6 @@ def eval_board(board: Board, patterns: list[tuple[int, tuple]], shortest_pat=Non
     return suma
 
 
-# TODO: ITERATIVE DEEPENING
-
 # TODO: vice vypocetniho caus do oblasti posledniho tahu
 
 # TODO: dalsi veci?
@@ -174,4 +173,28 @@ def get_best_move(board: Board, player: int, depth: int) -> tuple[int, int]:
             if evaluation < best_eval:
                 best_eval, best_move = evaluation, move
     assert type(best_move) is tuple
+    return best_move
+
+
+def iterative_deepening(board: Board, player: int, given_time: int = 10) -> tuple[int, int]:
+    """
+    given_time: time to spend in SECONDS
+    returns the best move found in the time
+    """
+    best_move = None
+    start = time.time()
+    depth = 1
+
+    # TEST: HAVE TO TEST this shit
+
+    # TODO: if bored improve time handling - currenlty possible to go upto tow times time we want
+
+    # absolutely laguhably sub-optimal - we dont have transposition table and hashing
+    # edge case: start 0.001 s new massive depth -> disaster, OMG...
+    while time.time() - start < given_time:
+        new_move = get_best_move(board, player, depth)
+        best_move = new_move
+        depth += 1
+
+    assert best_move is not None  # kvuli linteru
     return best_move
