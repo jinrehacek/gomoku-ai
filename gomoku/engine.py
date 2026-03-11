@@ -110,7 +110,14 @@ def eval_board(board: Board, patterns: list[tuple[int, tuple]], shortest_pat=Non
     return suma
 
 
-def minimax(board: Board, depth: int, player: int) -> int | float:
+# TODO: ITERATIVE DEEPENING
+
+# TODO: vice vypocetniho caus do oblasti posledniho tahu
+
+# TODO: dalsi veci?
+
+
+def minimax(board: Board, depth: int, player: int, alpha=float("-inf"), beta=float("+inf")) -> int | float:
     """
     MAX = 0, bily neb se zvysujici se eval_line vyhrava bily vice
     MIN = 1, cerny
@@ -126,20 +133,26 @@ def minimax(board: Board, depth: int, player: int) -> int | float:
         return eval_board(board=board, patterns=COMPLETE_PATTERNS, shortest_pat=SHORTEST)
 
     possible_moves = get_candidate_moves(board=board, distance=2)
-    best_eval = float("inf") * (-1 if player == 0 else 1)
 
     for move in possible_moves:
         board.place(*move)
-        evaluation = minimax(board, player=player ^ 1, depth=depth - 1)
+        evaluation = minimax(board, player=player ^ 1, depth=depth - 1, alpha=alpha, beta=beta)
 
         # cleanign the board
         board.remove_stone(*move)
-        if player == 0:
-            best_eval = max(best_eval, evaluation)
-        else:
-            best_eval = min(best_eval, evaluation)
 
-    return best_eval
+        if player == 0:
+            # MAX
+            alpha = max(alpha, evaluation)
+            if alpha >= beta:  # MIN isn't dumb - won't go here -> no need to calculate -> break
+                break
+        else:
+            # MIN
+            beta = min(beta, evaluation)
+            if beta <= alpha:  # MAX has better branch than this -> break
+                break
+
+    return alpha if player == 0 else beta
 
 
 def get_best_move(board: Board, player: int, depth: int) -> tuple[int, int]:
@@ -149,6 +162,7 @@ def get_best_move(board: Board, player: int, depth: int) -> tuple[int, int]:
 
     for move in possible_moves:
         board.place(*move)
+        # we dont pass alpha/beta cuz its the start, we have no values
         evaluation = minimax(board, player=player ^ 1, depth=depth - 1)
 
         board.remove_stone(*move)

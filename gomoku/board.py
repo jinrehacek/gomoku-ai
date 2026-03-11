@@ -44,12 +44,13 @@ class Board:
             self.data[x][y] = 0
             self.turn ^= 1
 
-    def undo_move(self):
-        if self.last_placed is None:
-            raise Exception("No move has been played!")
-        else:
-            x, y = self.last_placed
-            self.remove_stone(x, y)
+    # func is unnecessray  - I think #F00
+    # def undo_move(self):
+    #     if self.last_placed is None:
+    #         raise Exception("No move has been played!")
+    #     else:
+    #         x, y = self.last_placed
+    #         self.remove_stone(x, y)
 
     def dev_print(self):
         sada = [".", "O", "X"]
