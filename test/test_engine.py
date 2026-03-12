@@ -5,12 +5,10 @@ from gomoku.engine import (
     _immediate_neighbors,
     eval_line,
     prepare_patterns,
-    shortest_pattern,
     eval_board,
     minimax,
     get_best_move,
     COMPLETE_PATTERNS,
-    SHORTEST,
     WIN_CONSTANT,
 )
 
@@ -62,51 +60,29 @@ MOCK_PATTERNS = [
 ]
 
 
-def test_shortest_pattern():
-    assert shortest_pattern(MOCK_PATTERNS) == 3
-
-
-MIRRORED_MULTICULTURAL_PATTERNS = [
-    (10, (1, 1, 0)),
-    (10, (0, 1, 1)),
-    (50, (0, 1, 1, 1, 0)),
-    (-10, (2, 2, 0)),
-    (-10, (0, 2, 2)),
-    (-50, (0, 2, 2, 2, 0)),
-]
-
-
-def test_prepare_patterns():
-    got = set(prepare_patterns(MOCK_PATTERNS))
-    should = set(MIRRORED_MULTICULTURAL_PATTERNS)
-    assert got == should
-
-
 def test_eval_line():
     patterns = prepare_patterns(MOCK_PATTERNS)
-    sp = shortest_pattern(patterns)
-    assert eval_line([0, 1, 1, 1, 0], patterns, sp) == 70  # 10 + 50 + 10
-    assert eval_line([0, 2, 2, 2, 0], patterns, sp) == -70  # -10 -50 -10
-    assert eval_line([1, 1, 0, 0, 0], patterns, sp) == 10
-    assert eval_line([0, 0, 0, 0, 0], patterns, sp) == 0
-    assert eval_line([0, 1, 1, 0], patterns, sp) == 20  # 10 + 10
-    assert eval_line([1, 1], patterns, sp) == 0  # moc kratke
+    assert eval_line([0, 1, 1, 1, 0], patterns) == 70  # 10 + 50 + 10
+    assert eval_line([0, 2, 2, 2, 0], patterns) == -70  # -10 -50 -10
+    assert eval_line([1, 1, 0, 0, 0], patterns) == 10
+    assert eval_line([0, 0, 0, 0, 0], patterns) == 0
+    assert eval_line([0, 1, 1, 0], patterns) == 20  # 10 + 10
+    assert eval_line([1, 1], patterns) == 0  # moc kratke
 
 
 def test_eval_board():
     patterns = prepare_patterns(MOCK_PATTERNS)
-    sp = shortest_pattern(patterns)
 
     b = Board(size=4, win_len=3)
-    assert eval_board(b, patterns, sp) == 0
+    assert eval_board(b, patterns) == 0
 
     b = Board(size=4, win_len=3)
     b.data[0] = [1, 0, 0, 0]
-    assert eval_board(b, patterns, sp) == 0
+    assert eval_board(b, patterns) == 0
 
     b = Board(size=4, win_len=3)
     b.data[0] = [1, 1, 0, 0]
-    assert eval_board(b, patterns, sp) == 10
+    assert eval_board(b, patterns) == 10
 
     b = Board(size=4, win_len=3)
     b.data[0] = [0, 1, 1, 0]
@@ -115,25 +91,25 @@ def test_eval_board():
     b = Board(size=5, win_len=3)
     b.data[0] = [1, 1, 0, 0, 0]
     b.data[1] = [2, 2, 0, 0, 0]
-    assert eval_board(b, patterns, sp) == 0  # 10 + -10
+    assert eval_board(b, patterns) == 0  # 10 + -10
 
     # column [1,1,0,0]
     b = Board(size=4, win_len=3)
     b.data[0][0] = 1
     b.data[1][0] = 1
-    assert eval_board(b, patterns, sp) == 10
+    assert eval_board(b, patterns) == 10
 
     # diagonala \ [1,1,0,0]
     b = Board(size=4, win_len=3)
     b.data[0][0] = 1
     b.data[1][1] = 1
-    assert eval_board(b, patterns, sp) == 10
+    assert eval_board(b, patterns) == 10
 
     # diagonala / [1,1,0]
     b = Board(size=4, win_len=3)
     b.data[2][0] = 1
     b.data[1][1] = 1
-    assert eval_board(b, patterns, sp) == 10
+    assert eval_board(b, patterns) == 10
 
 
 def test_minimax_zero_depth():
@@ -141,7 +117,7 @@ def test_minimax_zero_depth():
     b.data[0] = [1, 1, 0, 0, 0]
 
     # je stejne jako eval_board - aka jede jen heuristika
-    expected = eval_board(b, COMPLETE_PATTERNS, SHORTEST)
+    expected = eval_board(b, COMPLETE_PATTERNS)
     assert minimax(b, depth=0, player=0) == expected
     assert minimax(b, depth=0, player=1) == expected
 

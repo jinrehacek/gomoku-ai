@@ -53,13 +53,6 @@ class Board:
             x, y = self.history.pop()
             self.remove_stone(x, y)
 
-    # def dev_print(self):
-    #     sada = [".", "O", "X"]
-    #     for i in range(self.LENGTH):
-    #         line = self.data[i]
-    #         a = [sada[j] for j in line]
-    #         print(" ".join(a))  # space so its more square-ish
-
     def is_full(self) -> bool:
         """
         returns True when stone in every square
@@ -94,6 +87,32 @@ class Board:
                 else:
                     together = 1
         return 0
+
+    def _get_xy_row(self, x: int) -> list[int]:
+        return self.data[x]
+
+    def _get_xy_col(self, y: int) -> list[int]:
+        return [self.data[i][y] for i in range(self.LENGTH)]
+
+    def _get_xy_diag1(self, x: int, y: int) -> list[int]:
+        posun = min(x, y)
+        diag: list[int] = []
+        n_x, n_y = x - posun, y - posun
+        while n_x < self.LENGTH and n_y < self.LENGTH:
+            diag.append(self.data[n_x][n_y])
+            n_x, n_y = n_x + 1, n_y + 1
+        return diag
+
+    def _get_xy_diag2(self, x: int, y: int) -> list[int]:
+        diag = []
+        n_x, n_y = x, y
+        while n_x + 1 < self.LENGTH and n_y - 1 >= 0:
+            n_x, n_y = n_x + 1, n_y - 1
+
+        while n_x >= 0 and n_y < self.LENGTH:
+            diag.append(self.data[n_x][n_y])
+            n_x, n_y = n_x - 1, n_y + 1
+        return diag
 
     def _get_all_rows(self):
         for i in range(self.LENGTH):
@@ -159,37 +178,25 @@ class Board:
         lx, ly = self.history[-1]
 
         # ROWS
-        state = self.check_line(self.data[lx])
+        line = self._get_xy_row(lx)
+        state = self.check_line(line)
         if state > 0:
             return state
 
         # COLUMNS
-        line = [self.data[x][ly] for x in range(self.LENGTH)]
+        line = self._get_xy_col(ly)
         state = self.check_line(line)
         if state > 0:
             return state
 
         # DIAGONAL \
-        posun = min(lx, ly)
-        diag: list[int] = []
-        x, y = lx - posun, ly - posun
-        while x < self.LENGTH and y < self.LENGTH:
-            diag.append(self.data[x][y])
-            x, y = x + 1, y + 1
+        diag = self._get_xy_diag1(lx, ly)
         state = self.check_line(diag)
         if state > 0:
             return state
 
         # DIAGONAL /
-        diag = []
-        x, y = lx, ly
-        while x + 1 < self.LENGTH and y - 1 >= 0:
-            x, y = x + 1, y - 1
-
-        while x >= 0 and y < self.LENGTH:
-            diag.append(self.data[x][y])
-            x, y = x - 1, y + 1
-
+        diag = self._get_xy_diag2(lx, ly)
         state = self.check_line(diag)
         if state > 0:
             return state

@@ -8,9 +8,10 @@ from rich.prompt import Prompt
 
 # GOMOKU imports
 from gomoku.board import Board
-from gomoku.engine import iterative_deepening
+from gomoku.engine import iterative_deepening, get_best_move
 
 import time
+from concurrent.futures import ThreadPoolExecutor
 
 # the main hero, bridges stdout with whatever shit i have
 cons = Console()
@@ -55,7 +56,10 @@ def board_coords_to_xy(s: str) -> tuple[int, int]:
     return x, y
 
 
-def play(size: int = 15):
+def play(size=15, fixed=0, our_time=10):
+    """
+    the defaults are useles ther is always passed defualt from main.py
+    """
     board = Board(size)
     cons.clear()
     tabulka = create_table(board)
@@ -76,8 +80,21 @@ def play(size: int = 15):
 
         # COMPLET SEARCH PATTERNS jsou computed on IMPORT, tedy jen JEDNOU
         start = time.time()
-        ai_move = iterative_deepening(board, player=1, given_time=10)
+        # ai_move, depth = iterative_deepening(board, player=1, given_time=10)
+
+        cons.print("\n")
+        if fixed == 0:
+            with cons.status("[bold cyan]Bot is thinking...", spinner="monkey"):
+                with ThreadPoolExecutor(max_workers=1) as ex:
+                    future = ex.submit(iterative_deepening, board, 1, our_time)  # board, player, given_time
+                    while not future.done():
+                        time.sleep(0.05)  # keeps loop responsive
+                    ai_move, depth = future.result()
+        else:
+            ai_move = get_best_move(board, 1, fixed)
+            depth = fixed
         board.place(*ai_move)
+        state = board.is_over()
         if state > 0:
             cons.print(str(state), style="bold magenta")
             break
@@ -88,3 +105,4 @@ def play(size: int = 15):
         current_time = time.time()
         zprava = Text()
         cons.print("Bot thought for " + str((current_time - start)) + "seconds")
+        cons.print("Bot went " + str((depth)) + "levels deep")

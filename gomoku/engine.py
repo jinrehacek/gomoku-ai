@@ -68,74 +68,79 @@ SEARCH_PATTERNS = [
 ]
 
 
-def shortest_pattern(patterns: list[tuple[int, tuple[int]]]) -> int:
-    """
-    returns int of length of shortest search pattern
-    """
-    lenghts = [len(x[1]) for x in patterns]
-    return min(lenghts)
-
-
-def prepare_patterns(patterns: list[tuple[int, tuple[int]]]):
+def prepare_patterns(patterns: list[tuple[int, tuple[int, ...]]]) -> dict[int, dict[tuple[int, ...], int]]:
     """
     Adds mirror images of patterns and then all patterns from perspective of black player
     """
-    out: list[tuple[int, tuple]] = []
+
+    # Dict{lenght of pattern: dict{pattern: score of pattern} }
+    n_out: dict[int, dict[tuple[int, ...], int]] = {}
 
     # Adding mirror images of patterns
     for pat in patterns:
         val, stones = pat
+        lgth = len(stones)
+        n_out.setdefault(lgth, {})
         rev = tuple([i for i in reversed(stones)])
         if stones == rev:
-            out.append(pat)
+            n_out[lgth][stones] = val
+
+            black_stones = tuple([(x % 2) + 1 if x else 0 for x in stones])
+            n_out[lgth][black_stones] = -val
         else:
-            out.append(pat)
-            out.append((val, rev))
+            n_out[lgth][stones] = val
+            n_out[lgth][rev] = val
 
-    # Adding corresponding patterns for black with negative val
-    for i in range(len(out)):
-        val, stones = out[i]
-        black_stones = tuple([(x % 2) + 1 if x else 0 for x in stones])
-        out.append((-val, black_stones))
+            black_stones = tuple([(x % 2) + 1 if x else 0 for x in stones])
+            n_out[lgth][black_stones] = -val
 
-    return out
+            black_rev = tuple([(x % 2) + 1 if x else 0 for x in rev])
+            n_out[lgth][black_rev] = -val
+
+    return n_out
 
 
-def eval_line(line: list[int], patterns: list[tuple[int, tuple]], shortest_pat: int) -> int:
+def eval_line(line: list[int], patterns: dict[int, dict[tuple[int, ...], int]]) -> int:
     """
     eval je z perspektivy bileho (+ kdyz vyhrava; - kdyz vyhrava cerny)
     """
+    n = len(line)
     suma = 0
-    for i in range(len(line) - shortest_pat + 1):
-        for val, stones in patterns:
-            len_pat = len(stones)
 
-            # pokud by pattern presahnul line
-            if i + len_pat > len(line):
-                continue
-
-            # napr pro i = 0 a len_pat = 4: 0 1 2 3
-            window = tuple(line[i : i + len_pat])
-
-            # pro patterns z pohledu cerneho je hodnota zaporna
-            if window == stones:
-                suma += val
+    # proseknujeme vsecchny patterns dle delky
+    for lgth, posloupnosti in patterns.items():
+        # patterny delsi nez line? nepotrebujeme
+        if lgth > n:
+            continue
+        # nas pattern je kratsi? budeme posouvat n-lgth krat
+        for i in range(0, n - lgth + 1):
+            okno = tuple(line[i : i + lgth])
+            score = posloupnosti.get(okno, 0)
+            suma += score
     return suma
 
 
-SHORTEST: int = shortest_pattern(SEARCH_PATTERNS)
 COMPLETE_PATTERNS = prepare_patterns(SEARCH_PATTERNS)
 WIN_CONSTANT: int = 99999999
 MOVES_TO_CONSIDER_DIST = 2
 
 
-def eval_board(board: Board, patterns: list[tuple[int, tuple]], shortest_pat=None) -> int:
-    if shortest_pat is None:
-        shortest_pat = shortest_pattern(patterns)
+def eval_move(board: Board, x: int, y: int, patterns) -> int:
+    d_row = eval_line(board._get_xy_row(x), patterns=patterns)
+    d_col = eval_line(board._get_xy_col(y), patterns)
+    d_diag1 = eval_line(board._get_xy_diag1(x, y), patterns)
+    d_diag2 = eval_line(board._get_xy_diag2(x, y), patterns)
+    suma = d_col + d_diag1 + d_diag2 + d_row
+    return suma
 
+
+# TEST: test new eval func
+
+
+def eval_board(board: Board, patterns: dict[int, dict[tuple[int, ...], int]]) -> int:
     suma = 0
     for line in board._get_all_lines():
-        suma += eval_line(line, patterns, shortest_pat)
+        suma += eval_line(line, patterns)
     return suma
 
 
@@ -144,7 +149,7 @@ def eval_board(board: Board, patterns: list[tuple[int, tuple]], shortest_pat=Non
 # TODO: dalsi veci?
 
 
-def minimax(board: Board, depth: int, player: int, alpha=float("-inf"), beta=float("+inf")) -> int | float:
+def minimax(board: Board, depth: int, player: int, curr_eval: int, alpha=float("-inf"), beta=float("+inf")) -> int | float:
     """
     MAX = 0, bily neb se zvysujici se eval_line vyhrava bily vice
     MIN = 1, cerny
@@ -157,13 +162,17 @@ def minimax(board: Board, depth: int, player: int, alpha=float("-inf"), beta=flo
         return a * WIN_CONSTANT  # mega velke cislo ktere prebije cokoliv jineho co je realen mozne dostat evaluaci herni plochy
 
     if depth == 0:
-        return eval_board(board=board, patterns=COMPLETE_PATTERNS, shortest_pat=SHORTEST)
+        # return eval_board(board=board, patterns=COMPLETE_PATTERNS)
+        return curr_eval
 
     possible_moves = get_candidate_moves(board=board, distance=MOVES_TO_CONSIDER_DIST)
 
     for move in possible_moves:
+        before = eval_move(board, *move, COMPLETE_PATTERNS)
         board.place(*move)
-        evaluation = minimax(board, player=player ^ 1, depth=depth - 1, alpha=alpha, beta=beta)
+        after = eval_move(board, *move, patterns=COMPLETE_PATTERNS)
+        e_delta = after - before
+        evaluation = minimax(board, player=player ^ 1, depth=depth - 1, curr_eval=curr_eval + e_delta, alpha=alpha, beta=beta)
 
         # cleaning the board
         board.undo_move()
@@ -189,10 +198,17 @@ def get_best_move(board: Board, player: int, depth: int) -> Coord:
 
     our_alpha, our_beta = float("-inf"), float("+inf")
 
+    base_eval = eval_board(board, COMPLETE_PATTERNS)
+
     for move in possible_moves:
+        before = eval_move(board, *move, COMPLETE_PATTERNS)
         board.place(*move)
+        after = eval_move(board, *move, patterns=COMPLETE_PATTERNS)
+        e_delta = after - before
         # we dont pass alpha/beta cuz its the start, we have no values
-        evaluation = minimax(board, player=player ^ 1, depth=depth - 1, alpha=our_alpha, beta=our_beta)
+        evaluation = minimax(
+            board, player=player ^ 1, depth=depth - 1, curr_eval=base_eval + e_delta, alpha=our_alpha, beta=our_beta
+        )
 
         board.undo_move()
 
@@ -209,7 +225,7 @@ def get_best_move(board: Board, player: int, depth: int) -> Coord:
     return best_move
 
 
-def iterative_deepening(board: Board, player: int, given_time: int = 10) -> Coord:
+def iterative_deepening(board: Board, player: int, given_time: int = 10) -> tuple[Coord, int]:
     """
     given_time: time to spend in SECONDS
     returns the best move found in the time
@@ -230,4 +246,4 @@ def iterative_deepening(board: Board, player: int, given_time: int = 10) -> Coor
         depth += 1
 
     assert best_move is not None  # kvuli linteru
-    return best_move
+    return best_move, depth - 1
