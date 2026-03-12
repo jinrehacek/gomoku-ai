@@ -169,14 +169,28 @@ def test_minimax_draw():
 
 def test_best_move_white():
     b = Board(size=7, win_len=5)
-    b.data[0] = [1, 1, 1, 1, 0, 0, 0]
+    b.place(0, 0)
+    b.place(6, 0)
+    b.place(0, 1)
+    b.place(6, 1)
+    b.place(0, 2)
+    b.place(6, 2)
+    b.place(0, 3)
+    b.place(6, 3)
     assert get_best_move(b, player=0, depth=2) == (0, 4)
 
 
 def test_best_move_black():
     b = Board(size=7, win_len=5)
-    b.data[0] = [2, 2, 2, 2, 0, 0, 0]
-    b.turn = 1
+    b.place(6, 0)
+    b.place(0, 0)
+    b.place(6, 1)
+    b.place(0, 1)
+    b.place(6, 2)
+    b.place(0, 2)
+    b.place(6, 3)
+    b.place(0, 3)
+    b.place(6, 4)
     assert get_best_move(b, player=1, depth=2) == (0, 4)
 
 

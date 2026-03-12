@@ -1,9 +1,13 @@
 # tady bude zit logika enginu ktery budu jenom importovat do nejspis IO.py
+from typing import Generator
 from gomoku.board import Board, Coord
 import time
 
 
-def _immediate_neighbors(x, y, distance: int, board_size: int):
+def _immediate_neighbors(x, y, distance: int, board_size: int) -> Generator[Coord]:
+    """
+    generates immediate neighbors of given square within some distance
+    """
     VALS = range(-distance, distance + 1)  # apparently possible
     for i in VALS:
         for j in VALS:
@@ -15,11 +19,20 @@ def _immediate_neighbors(x, y, distance: int, board_size: int):
 
 
 def get_candidate_moves(board: Board, distance: int) -> list[Coord]:
+    """
+    returns list of possible moves [Coord], sorted by proximity to last placed stone
+    """
     n = board.LENGTH
+
     # using sets for O(1) checking if coordinates are occupied or already in *out*
-    # subject to change if candidate move order is needed
     occupied = set()
     out = set()
+
+    # NOTE: This should NEVER run
+    if len(board.history) == 0:
+        # WARNING: NENI HOTOVE - this should not happen as opening will be handled differently
+        # but worst case this is usable
+        return [(n // 2, n // 2)]
 
     # saves time cuz we have all placed stones here
     for x, y in board.history:
@@ -29,7 +42,20 @@ def get_candidate_moves(board: Board, distance: int) -> list[Coord]:
         for i, j in _immediate_neighbors(x, y, distance, n):
             if (i, j) not in out and (i, j) not in occupied:
                 out.add((i, j))
-    return list(out)
+
+    unordered: list[Coord] = list(out)
+    ordered: list[tuple[int, Coord]] = []
+
+    # get the last placed stone
+    lx, ly = board.history[-1]
+
+    # Use inequality to sort by distance to last placed
+    ordered = [(max(abs(lx - x), abs(ly - y)), (x, y)) for x, y in unordered]
+    ordered.sort(key=lambda x: x[0])
+
+    # cutout the distance "eval" and just output sorted moves
+    out_moves: list[Coord] = [x[1] for x in ordered]
+    return out_moves
 
 
 SEARCH_PATTERNS = [
@@ -42,7 +68,7 @@ SEARCH_PATTERNS = [
 ]
 
 
-def shortest_pattern(patterns: list[tuple[int, tuple]]) -> int:
+def shortest_pattern(patterns: list[tuple[int, tuple[int]]]) -> int:
     """
     returns int of length of shortest search pattern
     """
@@ -50,7 +76,7 @@ def shortest_pattern(patterns: list[tuple[int, tuple]]) -> int:
     return min(lenghts)
 
 
-def prepare_patterns(patterns):
+def prepare_patterns(patterns: list[tuple[int, tuple[int]]]):
     """
     Adds mirror images of patterns and then all patterns from perspective of black player
     """
@@ -100,6 +126,7 @@ def eval_line(line: list[int], patterns: list[tuple[int, tuple]], shortest_pat: 
 SHORTEST: int = shortest_pattern(SEARCH_PATTERNS)
 COMPLETE_PATTERNS = prepare_patterns(SEARCH_PATTERNS)
 WIN_CONSTANT: int = 99999999
+MOVES_TO_CONSIDER_DIST = 2
 
 
 def eval_board(board: Board, patterns: list[tuple[int, tuple]], shortest_pat=None) -> int:
@@ -112,7 +139,7 @@ def eval_board(board: Board, patterns: list[tuple[int, tuple]], shortest_pat=Non
     return suma
 
 
-# TODO: vice vypocetniho caus do oblasti posledniho tahu
+# TODO: vice vypocetniho caus do oblasti posledniho tahu - momentalne je prvni ta oblast... mozna dam i ten cas
 
 # TODO: dalsi veci?
 
@@ -132,23 +159,13 @@ def minimax(board: Board, depth: int, player: int, alpha=float("-inf"), beta=flo
     if depth == 0:
         return eval_board(board=board, patterns=COMPLETE_PATTERNS, shortest_pat=SHORTEST)
 
-    possible_moves = get_candidate_moves(board=board, distance=2)
+    possible_moves = get_candidate_moves(board=board, distance=MOVES_TO_CONSIDER_DIST)
 
-    ann_moves: list[tuple[int, Coord]] = []
-    if len(board.history) > 0:
-        lx, ly = board.history[-1]
-        ann_moves = [(max(abs(lx - x), abs(ly - y)), (x, y)) for x, y in possible_moves]
-        ann_moves.sort(key=lambda x: x[0])
-
-    if len(ann_moves) == 0:
-        ann_moves = [(0, move) for move in possible_moves]
-
-    for a_move in ann_moves:
-        move = a_move[1]
+    for move in possible_moves:
         board.place(*move)
         evaluation = minimax(board, player=player ^ 1, depth=depth - 1, alpha=alpha, beta=beta)
 
-        # cleanign the board
+        # cleaning the board
         board.undo_move()
 
         if player == 0:
@@ -167,10 +184,10 @@ def minimax(board: Board, depth: int, player: int, alpha=float("-inf"), beta=flo
 
 def get_best_move(board: Board, player: int, depth: int) -> Coord:
     best_eval = float("inf") * (-1 if player == 0 else 1)
-    possible_moves = get_candidate_moves(board=board, distance=2)
+    possible_moves = get_candidate_moves(board=board, distance=MOVES_TO_CONSIDER_DIST)
     best_move = None
-    our_alpha = float("-inf")
-    our_beta = float("+inf")
+
+    our_alpha, our_beta = float("-inf"), float("+inf")
 
     for move in possible_moves:
         board.place(*move)
@@ -203,7 +220,7 @@ def iterative_deepening(board: Board, player: int, given_time: int = 10) -> Coor
 
     # TEST: HAVE TO TEST this shit
 
-    # TODO: if bored improve time handling - currenlty possible to go upto tow times time we want
+    # TODO: if bored improve time handling - currenlty possible to go 2^n+1 fo depth we want - fucking cooked
 
     # absolutely laguhably sub-optimal - we dont have transposition table and hashing
     # edge case: start 0.001 s new massive depth -> disaster, OMG...
