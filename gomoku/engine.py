@@ -4,6 +4,13 @@ from gomoku.board import Board, Coord
 import time
 
 
+SearchPatternsDict = dict[int, dict[tuple[int, ...], int]]
+
+
+class WeAreSlow(Exception):
+    pass
+
+
 def _immediate_neighbors(x, y, distance: int, board_size: int) -> Generator[Coord]:
     """
     generates immediate neighbors of given square within some distance
@@ -59,6 +66,7 @@ def get_candidate_moves(board: Board, distance: int) -> list[Coord]:
 
 
 SEARCH_PATTERNS = [
+    (10, (2, 1, 1, 1, 2)),
     (20, (2, 1, 1, 1, 0)),
     (75, (0, 1, 1, 1, 0)),
     (250, (2, 1, 1, 1, 1, 0)),
@@ -68,7 +76,7 @@ SEARCH_PATTERNS = [
 ]
 
 
-def prepare_patterns(patterns: list[tuple[int, tuple[int, ...]]]) -> dict[int, dict[tuple[int, ...], int]]:
+def prepare_patterns(patterns: list[tuple[int, tuple[int, ...]]]) -> SearchPatternsDict:
     """
     Adds mirror images of patterns and then all patterns from perspective of black player
     """
@@ -100,8 +108,9 @@ def prepare_patterns(patterns: list[tuple[int, tuple[int, ...]]]) -> dict[int, d
     return n_out
 
 
-def eval_line(line: list[int], patterns: dict[int, dict[tuple[int, ...], int]]) -> int:
+def eval_line(line: list[int], patterns: SearchPatternsDict) -> int:
     """
+    statically evalutaes given line - list[int] based on the given search patterns
     eval je z perspektivy bileho (+ kdyz vyhrava; - kdyz vyhrava cerny)
     """
     n = len(line)
@@ -120,13 +129,13 @@ def eval_line(line: list[int], patterns: dict[int, dict[tuple[int, ...], int]]) 
     return suma
 
 
-COMPLETE_PATTERNS = prepare_patterns(SEARCH_PATTERNS)
+COMPLETE_PATTERNS: SearchPatternsDict = prepare_patterns(SEARCH_PATTERNS)
 WIN_CONSTANT: int = 99999999
 MOVES_TO_CONSIDER_DIST = 2
 
 
-def eval_move(board: Board, x: int, y: int, patterns) -> int:
-    d_row = eval_line(board._get_xy_row(x), patterns=patterns)
+def eval_move(board: Board, x: int, y: int, patterns: SearchPatternsDict) -> int:
+    d_row = eval_line(board._get_xy_row(x), patterns)
     d_col = eval_line(board._get_xy_col(y), patterns)
     d_diag1 = eval_line(board._get_xy_diag1(x, y), patterns)
     d_diag2 = eval_line(board._get_xy_diag2(x, y), patterns)
@@ -137,7 +146,7 @@ def eval_move(board: Board, x: int, y: int, patterns) -> int:
 # TEST: test new eval func
 
 
-def eval_board(board: Board, patterns: dict[int, dict[tuple[int, ...], int]]) -> int:
+def eval_board(board: Board, patterns: SearchPatternsDict) -> int:
     suma = 0
     for line in board._get_all_lines():
         suma += eval_line(line, patterns)
@@ -149,34 +158,67 @@ def eval_board(board: Board, patterns: dict[int, dict[tuple[int, ...], int]]) ->
 # TODO: dalsi veci?
 
 
-def minimax(board: Board, depth: int, player: int, curr_eval: int, alpha=float("-inf"), beta=float("+inf")) -> int | float:
+def check_time(deadline: float | None, counter: list[int] = [0]):
+    if deadline is not None:
+        counter[0] += 1
+        if counter[0] % 256 == 1 and time.time() >= deadline:
+            raise WeAreSlow
+
+
+def minimax(
+    board: Board,
+    depth: int,
+    player: int,
+    curr_eval: int,
+    alpha=float("-inf"),
+    beta=float("+inf"),
+    deadline: float | None = None,
+    we_should_check: list[int] = [0],
+) -> int | float:
     """
     MAX = 0, bily neb se zvysujici se eval_line vyhrava bily vice
     MIN = 1, cerny
     """
 
+    # We look if the game isn't over
     situtation = board.is_over()
     if situtation > 0:
         a = situtation % 3
         a = -1 if a == 2 else a
         return a * WIN_CONSTANT  # mega velke cislo ktere prebije cokoliv jineho co je realen mozne dostat evaluaci herni plochy
 
+    # if we reached final depth -> return static eval
     if depth == 0:
-        # return eval_board(board=board, patterns=COMPLETE_PATTERNS)
         return curr_eval
+
+    check_time(deadline, we_should_check)
 
     possible_moves = get_candidate_moves(board=board, distance=MOVES_TO_CONSIDER_DIST)
 
     for move in possible_moves:
+        # evaluating 4 affected lines by the new move
         before = eval_move(board, *move, COMPLETE_PATTERNS)
         board.place(*move)
-        after = eval_move(board, *move, patterns=COMPLETE_PATTERNS)
-        e_delta = after - before
-        evaluation = minimax(board, player=player ^ 1, depth=depth - 1, curr_eval=curr_eval + e_delta, alpha=alpha, beta=beta)
+        try:
+            after = eval_move(board, *move, patterns=COMPLETE_PATTERNS)
+            e_delta = after - before
 
-        # cleaning the board
-        board.undo_move()
+            # recursion
+            evaluation = minimax(
+                board=board,
+                player=player ^ 1,
+                depth=depth - 1,
+                curr_eval=curr_eval + e_delta,
+                alpha=alpha,
+                beta=beta,
+                deadline=deadline,
+                we_should_check=we_should_check,
+            )
+        finally:
+            # undo move musi byt vzdy, i kdyz WeAreSlow
+            board.undo_move()
 
+        # what we found out
         if player == 0:
             # MAX
             alpha = max(alpha, evaluation)
@@ -191,7 +233,13 @@ def minimax(board: Board, depth: int, player: int, curr_eval: int, alpha=float("
     return alpha if player == 0 else beta
 
 
-def get_best_move(board: Board, player: int, depth: int) -> Coord:
+def get_best_move(
+    board: Board,
+    player: int,
+    depth: int,
+    we_should_check: list[int] = [0],  # protoze aby se presouvala reference, ne hodnota
+    deadline: float | None = None,
+) -> Coord:
     best_eval = float("inf") * (-1 if player == 0 else 1)
     possible_moves = get_candidate_moves(board=board, distance=MOVES_TO_CONSIDER_DIST)
     best_move = None
@@ -203,14 +251,22 @@ def get_best_move(board: Board, player: int, depth: int) -> Coord:
     for move in possible_moves:
         before = eval_move(board, *move, COMPLETE_PATTERNS)
         board.place(*move)
-        after = eval_move(board, *move, patterns=COMPLETE_PATTERNS)
-        e_delta = after - before
-        # we dont pass alpha/beta cuz its the start, we have no values
-        evaluation = minimax(
-            board, player=player ^ 1, depth=depth - 1, curr_eval=base_eval + e_delta, alpha=our_alpha, beta=our_beta
-        )
-
-        board.undo_move()
+        try:
+            after = eval_move(board, *move, patterns=COMPLETE_PATTERNS)
+            e_delta = after - before
+            # we dont pass alpha/beta cuz its the start, we have no values
+            evaluation = minimax(
+                board,
+                player=player ^ 1,
+                depth=depth - 1,
+                curr_eval=base_eval + e_delta,
+                alpha=our_alpha,
+                beta=our_beta,
+                deadline=deadline,
+                we_should_check=we_should_check,
+            )
+        finally:
+            board.undo_move()
 
         if player == 0:
             if evaluation > best_eval:
@@ -232,18 +288,18 @@ def iterative_deepening(board: Board, player: int, given_time: int = 10) -> tupl
     """
     best_move = None
     start = time.time()
-    depth = 1
+    deadline = start + given_time + 0.5
+    depth = 0
 
     # TEST: HAVE TO TEST this shit
-
-    # TODO: if bored improve time handling - currenlty possible to go 2^n+1 fo depth we want - fucking cooked
-
-    # absolutely laguhably sub-optimal - we dont have transposition table and hashing
-    # edge case: start 0.001 s new massive depth -> disaster, OMG...
-    while time.time() - start < given_time:
-        new_move = get_best_move(board, player, depth)
-        best_move = new_move
+    while time.time() < deadline:
         depth += 1
+        try:
+            new_move = get_best_move(board, player, depth, deadline=deadline)
+        except WeAreSlow:
+            depth -= 1
+            break
+        best_move = new_move
 
     assert best_move is not None  # kvuli linteru
-    return best_move, depth - 1
+    return best_move, depth

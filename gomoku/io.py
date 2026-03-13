@@ -1,4 +1,5 @@
 # MY RICH IMPORTS
+from typing import Literal
 from rich.text import Text
 from rich.console import Console
 from rich.table import Table
@@ -7,11 +8,12 @@ from rich.prompt import Prompt
 
 
 # GOMOKU imports
-from gomoku.board import Board
+from gomoku.board import WIN_LEN, Board, Coord
 from gomoku.engine import iterative_deepening, get_best_move
 
 import time
-from concurrent.futures import ThreadPoolExecutor
+import re
+from random import randint
 
 # the main hero, bridges stdout with whatever shit i have
 cons = Console()
@@ -20,6 +22,8 @@ cons = Console()
 def create_table(board: Board) -> Table:
     size = board.LENGTH
     grid = Table(show_header=False, show_edge=False, show_lines=True, box=TABLE_STYLE)
+
+    # MAPUJE JAK SE ZOBRAZI KAMENY
     mapa = {0: Text(""), 1: Text("X", style="bold red"), 2: Text("O", style="bold blue")}
 
     pismenka = [chr(ord("a") + x) for x in range(size)]
@@ -29,8 +33,6 @@ def create_table(board: Board) -> Table:
             grid.add_column(justify="right", width=2)
         else:
             grid.add_column(justify="center", width=1)
-
-    # MAPUJE JAK SE ZOBRAZI KAMENY
 
     # add rows one by one
     grid.add_row(Text(" "), *pismenka)
@@ -50,59 +52,85 @@ def create_table(board: Board) -> Table:
     return grid
 
 
-def board_coords_to_xy(s: str) -> tuple[int, int]:
+validation_pattern = re.compile(r"^[A-Za-z]\d{1,2}$")
+
+
+def valid_input(s: str) -> bool:
+    return bool(validation_pattern.fullmatch(s))
+
+
+def board_coords_to_xy(s: str, board: Board) -> Coord | Literal[False]:
+    if not valid_input(s):
+        return False
+
     x = int(s[1:]) - 1
     y = ord(s[0].lower()) - ord("a")
+
+    if x < 0 or y < 0:
+        return False
+
+    if x >= board.LENGTH or y >= board.LENGTH or board.data[x][y] != 0:
+        return False
+
     return x, y
 
 
-def play(size=15, fixed=0, our_time=10):
-    """
-    the defaults are useles ther is always passed defualt from main.py
-    """
-    board = Board(size)
+def redraw_board(board: Board):
     cons.clear()
-    tabulka = create_table(board)
-    cons.print(tabulka)
+    board_table = create_table(board)
+    cons.print(board_table)
+
+
+def get_inp_num(message: str, ok_nums: list[int]):
+    while True:
+        s = Prompt.ask(Text(message))
+        num = int(s.strip())
+        if num in ok_nums:
+            return num
+        else:
+            cons.print("[orange_red1] Wrong input, please try again.")
+
+
+def pick_mode_and_swap(board):
+    cons.print(Text("Do you want to play Human vs AI (1), or watch matchup AI vs. AI? (2)"))
+    num = get_inp_num("Input 1 or 2 accordingly", [1, 2])
+
+    if num == 1:
+        cons.print(Text("Who do you want to start/setu-up Swap-2? \n(1) You\n(2) AI\n(3)Suprise me."))
+        swap = get_inp_num("Input number of your choice", [1, 2, 3])
+        if swap == 3:
+            swap = randint(1, 2)
+        return swap
+    return 0
+
+
+def human_move(board: Board):
+    checked: Coord | bool = False
     while True:
         user_move = Prompt.ask("Enter your move (g8, a5, ...)")
-
-        board.place(*board_coords_to_xy(user_move))
-        state = board.is_over()
-
-        cons.clear()
-        tabulka = create_table(board)
-        cons.print(tabulka)
-
-        if state > 0:
-            cons.print(str(state), style="bold magenta")
+        checked = board_coords_to_xy(user_move, board)
+        if checked is not False:
             break
+        cons.print("[orange_red1]Wrong input or occupied square. Please try again.")
 
-        # COMPLET SEARCH PATTERNS jsou computed on IMPORT, tedy jen JEDNOU
-        start = time.time()
-        # ai_move, depth = iterative_deepening(board, player=1, given_time=10)
+    board.place(*checked)
+    redraw_board(board)
 
-        cons.print("\n")
-        if fixed == 0:
-            with cons.status("[bold cyan]Bot is thinking...", spinner="monkey"):
-                with ThreadPoolExecutor(max_workers=1) as ex:
-                    future = ex.submit(iterative_deepening, board, 1, our_time)  # board, player, given_time
-                    while not future.done():
-                        time.sleep(0.05)  # keeps loop responsive
-                    ai_move, depth = future.result()
-        else:
-            ai_move = get_best_move(board, 1, fixed)
-            depth = fixed
-        board.place(*ai_move)
-        state = board.is_over()
-        if state > 0:
-            cons.print(str(state), style="bold magenta")
-            break
 
-        cons.clear()
-        tabulka = create_table(board)
-        cons.print(tabulka)
-        current_time = time.time()
-        zprava = Text()
-        cons.print("Bot thought for " + str((current_time - start)) + "seconds")
-        cons.print("Bot went " + str((depth)) + "levels deep")
+def ai_move(board: Board, time_limit: int, fixed: int, as_player=1):
+    # COMPLET SEARCH PATTERNS jsou computed on IMPORT, tedy jen JEDNOU
+    cons.print("[magenta] AI is deep in thought.")
+
+    start = time.time()
+
+    if fixed == 0:
+        ai_move, depth = iterative_deepening(board, as_player, time_limit)  # board, player, given_time
+    else:
+        ai_move = get_best_move(board, as_player, fixed)
+        depth = fixed
+    board.place(*ai_move)
+
+    redraw_board(board)
+
+    cons.print("AI pondered for " + str(round(time.time() - start, 2)) + " seconds. (Beep boop)")
+    cons.print("Computer saw " + str((depth + 1 // 2)) + " moves ahead.")
