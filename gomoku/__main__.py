@@ -1,6 +1,6 @@
 from rich.text import Text
 from gomoku.board import Board
-from gomoku.io import human_move, ai_swap, ai_move, cons, human_swap, redraw_board, pick_mode_and_swap
+from gomoku.io import human_move, ai_swap, ai_move, ai_vs_ai_swap, cons, human_swap, redraw_board, pick_mode_and_swap
 import argparse
 
 
@@ -28,18 +28,39 @@ assert args.swap in [0, 1, 2]
 
 def main():
     board = Board(size=args.size, win_len=args.win)
-    if args.swap:
-        swap_maker = args.swap
-    else:
-        swap_maker = pick_mode_and_swap(board)
 
+    # Getting user's choice on mode and swap
+    if not args.ai and not args.swap:
+        mode, swap_maker = pick_mode_and_swap()
+    elif args.swap and not args.ai:
+        swap_maker = args.swap
+        mode = 1
+    else:
+        mode, swap_maker = 2, 0
+
+    # Swap2 Handling
     if swap_maker == 1:
         human_player = human_swap(board, args.time, args.fixed)
-    else:
+    elif swap_maker == 2:
         human_player = ai_swap(board, time_limit=args.time, fixed=args.fixed)
-
+    else:
+        human_player = None
     redraw_board(board)
-    while True:
+
+    if mode == 2:
+        ai_vs_ai_swap(board, time_limit=args.time, fixed=args.fixed)
+        while True:
+            ai_move(board, time_limit=args.time, fixed=args.fixed)
+            state = board.is_over()
+            if state > 0:
+                cons.print(
+                    "[bold blink red]🤖 One ROBOT Won 🤖[/bold blink red] "
+                    "[bold blink white]the silicon wars are over.[/bold blink white]"
+                )
+                break
+        return
+
+    while True and mode == 1:
         if board.turn == human_player:
             human_move(board)
             state = board.is_over()
