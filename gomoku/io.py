@@ -1,5 +1,5 @@
 # MY RICH IMPORTS
-from typing import Literal
+from typing import Literal, cast
 from rich.text import Text
 from rich.console import Console
 from rich.table import Table
@@ -8,8 +8,8 @@ from rich.prompt import Prompt
 
 
 # GOMOKU imports
-from gomoku.board import WIN_LEN, Board, Coord
-from gomoku.engine import iterative_deepening, get_best_move
+from gomoku.board import Board, Coord, Player
+from gomoku.engine import COMPLETE_PATTERNS, eval_board, iterative_deepening, get_best_move, minimax
 
 import time
 import re
@@ -96,12 +96,108 @@ def pick_mode_and_swap(board):
     num = get_inp_num("Input 1 or 2 accordingly", [1, 2])
 
     if num == 1:
-        cons.print(Text("Who do you want to start/setu-up Swap-2? \n(1) You\n(2) AI\n(3)Suprise me."))
+        cons.print(Text("Who do you want to start/set-up Swap-2? \n(1) You\n(2) AI\n(3) Suprise me."))
         swap = get_inp_num("Input number of your choice", [1, 2, 3])
         if swap == 3:
             swap = randint(1, 2)
         return swap
-    return 0
+    return 2
+
+
+def computer_chooses_side(board: Board, time_limit: int, fixed: int) -> Player:
+    current_player = board.turn
+    opening_eval = minimax(board, 4, current_player, curr_eval=eval_board(board, COMPLETE_PATTERNS))
+
+    if opening_eval > 0:
+        ai_player = 0
+    elif opening_eval < 0:
+        ai_player = 1
+    else:
+        ai_player = current_player
+
+    human_player = ai_player ^ 1
+
+    if ai_player == current_player:
+        cons.print("Computer chose the side to move now.")
+        ai_move(board, time_limit=time_limit, fixed=fixed)
+    else:
+        cons.print("Computer chose the other side. Please make a move.")
+
+    return human_player  # pyright: ignore
+
+
+def human_swap(board: Board, time_limit: int, fixed: int) -> Player:
+    while True:
+        a = Prompt.ask(
+            Text(
+                "Please input the coordinations of Swap2 opening in format 'cross_1 cross_2 circle_1' \n eg. 'a1 h5 b2' where cross stones are on a1 and h5"
+            )
+        )
+        coords = a.strip().split()
+        if len(coords) != 3:
+            cons.print("[orange_red1]Please input exactly 3 coordinates.[/orange_red1]")
+            continue
+
+        c = tuple([board_coords_to_xy(x, board) for x in coords])
+        if False in c:
+            cons.print("[orange_red1]Wrong input or occupied square. Please try again.")
+            continue
+        else:
+            b1, b2, w1 = c
+            break
+
+    board.place(*b1)  # pyright: ignore
+    board.place(*w1)  # pyright: ignore
+    board.place(*b2)  # pyright: ignore
+    redraw_board(board)
+
+    return computer_chooses_side(board, time_limit, fixed)
+
+
+def ai_swap(board: Board, time_limit: int, fixed: int) -> Player:
+    lght = board.LENGTH
+    half = lght // 4
+    board.place(half, half)
+    board.place(lght // 2 + randint(-half, half), lght // 2)
+    board.place(lght - half, lght - half + randint(-half, half))
+    redraw_board(board)
+
+    cons.print(Text("Do you want to play this position as (1) cross/X, (2) circle/O or (3) add two more stones?"))
+    swap = get_inp_num("Input number of your choice", [1, 2, 3])
+    current_player = board.turn
+    if swap == 2:
+        return current_player  # pyright: ignore
+
+    if swap == 1:
+        human_player = current_player ^ 1
+        ai_move(board, time_limit=time_limit, fixed=fixed)
+        return human_player  # pyright: ignore
+
+    # If player chooses to add 2 more stones
+    while True:
+        a = Prompt.ask(
+            Text(
+                "Please input the coordinations of the additional stones in format 'cross_1 circle_1' \n eg. 'a1 b2' where cross is on a1"
+            )
+        )
+        coords = a.strip().split()
+        if len(coords) != 2:
+            cons.print("[orange_red1]Please input exactly 2 coordinates.[/orange_red1]")
+            continue
+
+        c = tuple([board_coords_to_xy(x, board) for x in coords])
+        if False in c:
+            cons.print("[orange_red1]Wrong input or occupied square. Please try again.")
+            continue
+        else:
+            b1, w1 = c
+            break
+
+    board.place(*b1)  # pyright: ignore
+    board.place(*w1)  # pyright: ignore
+    redraw_board(board)
+
+    return computer_chooses_side(board, time_limit, fixed)
 
 
 def human_move(board: Board):
@@ -117,11 +213,14 @@ def human_move(board: Board):
     redraw_board(board)
 
 
-def ai_move(board: Board, time_limit: int, fixed: int, as_player=1):
+def ai_move(board: Board, time_limit: int, fixed: int, as_player: int | None = None):
     # COMPLET SEARCH PATTERNS jsou computed on IMPORT, tedy jen JEDNOU
     cons.print("[magenta] AI is deep in thought.")
 
     start = time.time()
+
+    if as_player is None:
+        as_player = board.turn
 
     if fixed == 0:
         ai_move, depth = iterative_deepening(board, as_player, time_limit)  # board, player, given_time
