@@ -166,8 +166,8 @@ TOP_K_MOVES = None
 
 
 def eval_move(board: Board, x: int, y: int, patterns: SearchPatternsDict) -> int:
-    d_row = eval_line(board._get_xy_row(x)[max(0, x - 6) : x + 6], patterns)
-    d_col = eval_line(board._get_xy_col(y)[max(0, y - 6) : y + 6], patterns)
+    d_row = eval_line(board._get_xy_row(x)[max(0, x - 6) : x + 7], patterns)
+    d_col = eval_line(board._get_xy_col(y)[max(0, y - 6) : y + 7], patterns)
     d_diag1 = eval_line(board._get_xy_diag1(x, y), patterns)
     d_diag2 = eval_line(board._get_xy_diag2(x, y), patterns)
     suma = d_col + d_diag1 + d_diag2 + d_row
@@ -308,7 +308,7 @@ def minimax(
 
     possible_moves = get_candidate_moves(board=board, distance=_candidate_distance(board))
 
-    # we apply the "advanced tactical ordering" on leaves forcing the moves
+    # we apply the "advanced tactical ordering" ALWAYS
     if depth > -2:
         possible_moves = _order_moves_tactical(
             board=board,
