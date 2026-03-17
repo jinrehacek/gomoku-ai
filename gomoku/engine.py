@@ -166,8 +166,8 @@ TOP_K_MOVES = None
 
 
 def eval_move(board: Board, x: int, y: int, patterns: SearchPatternsDict) -> int:
-    d_row = eval_line(board._get_xy_row(x), patterns)
-    d_col = eval_line(board._get_xy_col(y), patterns)
+    d_row = eval_line(board._get_xy_row(x)[max(0, x - 6) : x + 6], patterns)
+    d_col = eval_line(board._get_xy_col(y)[max(0, y - 6) : y + 6], patterns)
     d_diag1 = eval_line(board._get_xy_diag1(x, y), patterns)
     d_diag2 = eval_line(board._get_xy_diag2(x, y), patterns)
     suma = d_col + d_diag1 + d_diag2 + d_row
@@ -187,7 +187,7 @@ def eval_board(board: Board, patterns: SearchPatternsDict) -> int:
 def check_time(deadline: float | None, counter: list[int] | None = None):
     if deadline is not None and counter is not None:
         counter[0] += 1
-        if counter[0] % 256 == 1 and time.time() >= deadline:
+        if counter[0] % 1024 == 1 and time.time() >= deadline:
             raise WeAreSlow
 
 
@@ -289,7 +289,9 @@ def minimax(
     if situtation > 0:
         a = situtation % 3
         a = -1 if a == 2 else a
-        return a * WIN_CONSTANT  # mega velke cislo ktere prebije cokoliv jineho co je realen mozne dostat evaluaci herni plochy
+        return a * (
+            WIN_CONSTANT + (10 * depth)
+        )  # mega velke cislo ktere prebije cokoliv jineho co je realen mozne dostat evaluaci herni plochy
 
     if curr_eval is None:
         curr_eval = eval_board(board, COMPLETE_PATTERNS)
@@ -307,7 +309,7 @@ def minimax(
     possible_moves = get_candidate_moves(board=board, distance=_candidate_distance(board))
 
     # we apply the "advanced tactical ordering" on leaves forcing the moves
-    if depth <= 1:
+    if depth > -2:
         possible_moves = _order_moves_tactical(
             board=board,
             player=player,
