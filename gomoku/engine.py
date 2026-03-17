@@ -13,8 +13,9 @@ HistoryTable = dict[tuple[int, int, int], int]
 class SearchState:
     """
     Holds mutable search state that gets bumped around in minimax
-    handles time checking
-    - history: history heuristic scores
+    handles history heuristic scores - we find move really cool before? big cutoff, it helped us? we try it AGAIN next ply or next iteration
+    in deepening
+    hold the counter of how many nodes/vertices we visited/played in self.counter
     """
 
     def __init__(self):
@@ -22,23 +23,32 @@ class SearchState:
         self.history: HistoryTable = {}
 
     def update_history(self, player: int, move: Coord, depth: int):
-        """Award move that caused cutoff with depth^2 bonus."""
+        """
+        Award move that caused cutoff with bonus
+        """
         key = (player, move[0], move[1])
         self.history[key] = self.history.get(key, 0) + depth * depth
 
     def get_history_score(self, player: int, move: Coord) -> int:
-        """Get history score for move (0 if not seen)."""
+        """
+        Get history score for move (0 if not seen before)
+        """
         key = (player, move[0], move[1])
         return self.history.get(key, 0)
 
 
 class WeAreSlow(Exception):
+    """
+    special exception only we know how to handle, if we raise it we let it bubble up the minimax to get_best_move up to
+    iterative_deepening where we cathc it and send last fully calculated best_move out
+    """
+
     pass
 
 
 def _immediate_neighbors(x, y, distance: int, board_size: int) -> Generator[Coord]:
     """
-    generates immediate neighbors of given square within some distance
+    generates immediate neighbors of given square within some given distance
     """
     VALS = range(-distance, distance + 1)  # apparently possible
     for i in VALS:
@@ -102,6 +112,14 @@ SEARCH_PATTERNS = [
 ]
 
 
+def black_stones_eq(pattern: tuple[int, ...]) -> tuple[int, ...]:
+    """
+    creates equivalent pattern from black POV
+    just flips 1 with 2 in given pattern
+    """
+    return tuple([(x % 2) + 1 if x else 0 for x in pattern])
+
+
 def prepare_patterns(patterns: list[tuple[int, tuple[int, ...]]]) -> SearchPatternsDict:
     """
     Adds mirror images of patterns and then all patterns from perspective of black player
@@ -114,30 +132,36 @@ def prepare_patterns(patterns: list[tuple[int, tuple[int, ...]]]) -> SearchPatte
     for pat in patterns:
         val, stones = pat
         lgth = len(stones)
+        # if length of the pattern not key in outer dict, create it
         n_out.setdefault(lgth, {})
+
+        # reversed stone sequence
         rev = tuple([i for i in reversed(stones)])
+
+        # the stone sequence is palindrome
         if stones == rev:
             n_out[lgth][stones] = val
 
-            black_stones = tuple([(x % 2) + 1 if x else 0 for x in stones])
+            black_stones = black_stones_eq(stones)
             n_out[lgth][black_stones] = -val
+
+        # the stone sequence ISN'T palindrome
         else:
             n_out[lgth][stones] = val
             n_out[lgth][rev] = val
 
-            black_stones = tuple([(x % 2) + 1 if x else 0 for x in stones])
+            black_stones = black_stones_eq(stones)
             n_out[lgth][black_stones] = -val
 
-            black_rev = tuple([(x % 2) + 1 if x else 0 for x in rev])
+            black_rev = black_stones_eq(rev)
             n_out[lgth][black_rev] = -val
-
     return n_out
 
 
 def eval_line(line: list[int], patterns: SearchPatternsDict) -> int:
     """
-    statically evalutaes given line - list[int] based on the given search patterns
-    eval je z perspektivy bileho (+ kdyz vyhrava; - kdyz vyhrava cerny)
+    statically evaluates given line - list[int] based on the given search patterns
+    eval is from the POV of WHITE (+ white is better; - black is better)
     """
     n = len(line)
     suma = 0
@@ -155,29 +179,36 @@ def eval_line(line: list[int], patterns: SearchPatternsDict) -> int:
     return suma
 
 
+# patterns dict we use in other funcs
 COMPLETE_PATTERNS: SearchPatternsDict = prepare_patterns(SEARCH_PATTERNS)
-WIN_CONSTANT: int = 99999999
 
 # IMPORTANT CONSTANTS
-MOVES_TO_CONSIDER_DIST = 2
-OPENING_DISTANCE = 1
-OPENING_MOVES_LIMIT = 8
-TOP_K_MOVES = None
+MOVES_TO_CONSIDER_DIST = 2  # normally we look for immediate neighbors distance = 2
+OPENING_DISTANCE = 1  # in opening we only look for immediate neighbors distance = 1
+OPENING_MOVES_LIMIT = 8  # after 8 or more stones are placed -> we arent in opening anymore
+EVAL_MOVE_SLICE_HALF = 6  # how long is half of the slice in eval_move
+TOP_K_MOVES = None  # was used before, kept in case the top k moves idea is revived
+WIN_CONSTANT = 99999999  # eval constant if the position is won, just gigantic number
 
 
 def eval_move(board: Board, x: int, y: int, patterns: SearchPatternsDict) -> int:
-    d_row = eval_line(board._get_xy_row(x)[max(0, x - 6) : x + 7], patterns)
-    d_col = eval_line(board._get_xy_col(y)[max(0, y - 6) : y + 7], patterns)
+    """
+    very smart function, we only evaluate the change of board static eval caused by given move
+    we look only at two diagonals, 1 row & 1 col - those whose part is the move we just played
+    row & col is sliced so it just cares about slice big enough around such it fits every pattern
+    """
+    d_row = eval_line(board._get_xy_row(x)[max(0, x - EVAL_MOVE_SLICE_HALF) : x + EVAL_MOVE_SLICE_HALF + 1], patterns)
+    d_col = eval_line(board._get_xy_col(y)[max(0, y - EVAL_MOVE_SLICE_HALF) : y + EVAL_MOVE_SLICE_HALF + 1], patterns)
     d_diag1 = eval_line(board._get_xy_diag1(x, y), patterns)
     d_diag2 = eval_line(board._get_xy_diag2(x, y), patterns)
     suma = d_col + d_diag1 + d_diag2 + d_row
     return suma
 
 
-# TEST: test new eval func
-
-
 def eval_board(board: Board, patterns: SearchPatternsDict) -> int:
+    """
+    statically evaluates whole board using eval_line function
+    """
     suma = 0
     for line in board._get_all_lines():
         suma += eval_line(line, patterns)
@@ -236,6 +267,7 @@ def _order_moves_tactical(
     winning_moves: list[Coord] = []
     boring_moves: list[Coord] = []
 
+    # is move immediate win? append to winning_moves and return just those, no need for other choices
     for move in moves:
         if _move_wins_for(board, move, player):
             winning_moves.append(move)
@@ -246,27 +278,29 @@ def _order_moves_tactical(
         return winning_moves
 
     opponent = player ^ 1
-    opponent_winning_squares = {move for move in moves if _move_wins_for(board, move, opponent)}
     blocking_moves: list[Coord] = []
-    quiet_after_blocks: list[Coord] = []
+    boring_moves_no_blocks: list[Coord] = []
 
-    for move in moves:
+    # does the move block immediate win by opponent? same vibe as before
+    opponent_winning_squares = {mv for mv in moves if _move_wins_for(board, mv, opponent)}
+    for move in boring_moves:
         if move in opponent_winning_squares:
             blocking_moves.append(move)
         else:
-            quiet_after_blocks.append(move)
+            boring_moves_no_blocks.append(move)
 
     if blocking_moves:
         return blocking_moves
 
     # sort quiet moves by history heuristic if state is availiable
     if state is not None and state.history:
-        quiet_after_blocks.sort(key=lambda m: state.get_history_score(player, m), reverse=True)
+        boring_moves_no_blocks.sort(key=lambda m: state.get_history_score(player, m), reverse=True)
 
+    # kept here just in case, not being used by the code rn
     if top_k is not None:
-        return quiet_after_blocks[:top_k]
+        return boring_moves_no_blocks[:top_k]
 
-    return quiet_after_blocks
+    return boring_moves_no_blocks
 
 
 def minimax(
@@ -280,6 +314,12 @@ def minimax(
     state: SearchState | None = None,
 ) -> int | float:
     """
+    the main character
+    depth: how many levels deep we should go in the subtree
+    player: from whose perspective we are playing
+    curr_eval: static evaluation of the board before we start trying moves
+    alpha, beta: cutoff interval
+    deadline: time till which we have to finish
     MAX = 0, bily neb se zvysujici se eval_line vyhrava bily vice
     MIN = 1, cerny
     """
@@ -293,6 +333,7 @@ def minimax(
             WIN_CONSTANT + (10 * depth)
         )  # mega velke cislo ktere prebije cokoliv jineho co je realen mozne dostat evaluaci herni plochy
 
+    # if we didnt get curr_eval passed in (shouldnt happen), lets compute it and pass it down
     if curr_eval is None:
         curr_eval = eval_board(board, COMPLETE_PATTERNS)
 
@@ -300,6 +341,7 @@ def minimax(
     if depth == 0:
         return curr_eval
 
+    # if we didnt get state passed in, initialize it and pass it down
     if state is None:
         state = SearchState()
 
