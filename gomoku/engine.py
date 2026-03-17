@@ -189,6 +189,7 @@ OPENING_MOVES_LIMIT = 8  # after 8 or more stones are placed -> we arent in open
 EVAL_MOVE_SLICE_HALF = 6  # how long is half of the slice in eval_move
 TOP_K_MOVES = None  # was used before, kept in case the top k moves idea is revived
 WIN_CONSTANT = 99999999  # eval constant if the position is won, just gigantic number
+WHEN_TO_USE_TACTICS = float("inf")
 
 
 def eval_move(board: Board, x: int, y: int, patterns: SearchPatternsDict) -> int:
@@ -320,8 +321,6 @@ def minimax(
     curr_eval: static evaluation of the board before we start trying moves
     alpha, beta: cutoff interval
     deadline: time till which we have to finish
-    MAX = 0, bily neb se zvysujici se eval_line vyhrava bily vice
-    MIN = 1, cerny
     """
 
     # We look if the game isn't over
@@ -351,7 +350,7 @@ def minimax(
     possible_moves = get_candidate_moves(board=board, distance=_candidate_distance(board))
 
     # we apply the "advanced tactical ordering" ALWAYS
-    if depth > -2:
+    if depth <= WHEN_TO_USE_TACTICS:
         possible_moves = _order_moves_tactical(
             board=board,
             player=player,
@@ -359,9 +358,6 @@ def minimax(
             top_k=TOP_K_MOVES,
             state=state,
         )
-    elif state.history:
-        # for deeper nodes, just sort by history (no tactical check overhead)
-        possible_moves.sort(key=lambda m: state.get_history_score(player, m), reverse=True)
 
     for move in possible_moves:
         # evaluating 4 affected lines by the new move
@@ -410,10 +406,15 @@ def get_best_move(
     pv_move: Coord | None = None,
     state: SearchState | None = None,
 ) -> Coord:
+
+    # if we didnt get state passed in, initialize it and pass it down
     if state is None:
         state = SearchState()
 
+    # -inf | +inf for max | min
     best_eval = float("inf") * (-1 if player == 0 else 1)
+
+    # get moves, order them by tactics aswell
     possible_moves = get_candidate_moves(board=board, distance=_candidate_distance(board))
     possible_moves = _order_moves_tactical(
         board=board,
@@ -432,14 +433,19 @@ def get_best_move(
 
     our_alpha, our_beta = float("-inf"), float("+inf")
 
+    # eval of hte full board; to be passed into minimax
     base_eval = eval_board(board, COMPLETE_PATTERNS)
 
     for move in possible_moves:
         before = eval_move(board, *move, COMPLETE_PATTERNS)
         board.place(*move)
+        # try/finnally bcs of WeAreSlow
+        # no expect bcs we want ti to bubbe up to iterative_deepening
         try:
+            # how does the move change the board eval
             after = eval_move(board, *move, patterns=COMPLETE_PATTERNS)
             e_delta = after - before
+
             evaluation = minimax(
                 board,
                 player=player ^ 1,
@@ -476,7 +482,7 @@ def iterative_deepening(board: Board, player: int, given_time: int = 10) -> tupl
     deadline = start + given_time + 0.5
     depth = 0
 
-    # shared state across all depths - history heuristic accumulates
+    # shared state across all iterations -> history heuristic gets bigger/better
     state = SearchState()
 
     while time.time() < deadline:
