@@ -1,10 +1,35 @@
 # tady bude zit logika enginu ktery budu jenom importovat do nejspis IO.py
-from typing import Generator
-from gomoku.board import Board, Coord
 import time
+from typing import Generator
 
+from gomoku.board import Board, Coord
 
 SearchPatternsDict = dict[int, dict[tuple[int, ...], int]]
+
+# History heuristic: key = (player, x, y), value = cumulative score
+HistoryTable = dict[tuple[int, int, int], int]
+
+
+class SearchState:
+    """
+    Holds mutable search state that gets bumped around in minimax
+    handles time checking
+    - history: history heuristic scores
+    """
+
+    def __init__(self):
+        self.counter: list[int] = [0]
+        self.history: HistoryTable = {}
+
+    def update_history(self, player: int, move: Coord, depth: int):
+        """Award move that caused cutoff with depth^2 bonus."""
+        key = (player, move[0], move[1])
+        self.history[key] = self.history.get(key, 0) + depth * depth
+
+    def get_history_score(self, player: int, move: Coord) -> int:
+        """Get history score for move (0 if not seen)."""
+        key = (player, move[0], move[1])
+        return self.history.get(key, 0)
 
 
 class WeAreSlow(Exception):
@@ -35,10 +60,8 @@ def get_candidate_moves(board: Board, distance: int) -> list[Coord]:
     occupied = set()
     out = set()
 
-    # NOTE: This should NEVER run
+    # just here as precaution, will never run
     if len(board.history) == 0:
-        # WARNING: NENI HOTOVE - this should not happen as opening will be handled differently
-        # but worst case this is usable
         return [(n // 2, n // 2)]
 
     # saves time cuz we have all placed stones here
@@ -69,6 +92,9 @@ SEARCH_PATTERNS = [
     (10, (2, 1, 1, 1, 2)),
     (20, (2, 1, 1, 1, 0)),
     (75, (0, 1, 1, 1, 0)),
+    (120, (0, 1, 1, 0, 1, 0)),
+    (120, (0, 1, 1, 0, 1, 2)),
+    (120, (2, 1, 1, 0, 1, 0)),
     (250, (2, 1, 1, 1, 1, 0)),
     (250, (1, 0, 1, 1, 1)),
     (250, (1, 1, 0, 1, 1)),
@@ -131,7 +157,12 @@ def eval_line(line: list[int], patterns: SearchPatternsDict) -> int:
 
 COMPLETE_PATTERNS: SearchPatternsDict = prepare_patterns(SEARCH_PATTERNS)
 WIN_CONSTANT: int = 99999999
+
+# IMPORTANT CONSTANTS
 MOVES_TO_CONSIDER_DIST = 2
+OPENING_DISTANCE = 1
+OPENING_MOVES_LIMIT = 8
+TOP_K_MOVES = None
 
 
 def eval_move(board: Board, x: int, y: int, patterns: SearchPatternsDict) -> int:
@@ -153,27 +184,100 @@ def eval_board(board: Board, patterns: SearchPatternsDict) -> int:
     return suma
 
 
-# TODO: vice vypocetniho caus do oblasti posledniho tahu - momentalne je prvni ta oblast... mozna dam i ten cas
-
-# TODO: dalsi veci?
-
-
-def check_time(deadline: float | None, counter: list[int] = [0]):
-    if deadline is not None:
+def check_time(deadline: float | None, counter: list[int] | None = None):
+    if deadline is not None and counter is not None:
         counter[0] += 1
         if counter[0] % 256 == 1 and time.time() >= deadline:
             raise WeAreSlow
+
+
+def _candidate_distance(board: Board) -> int:
+    """
+    in opening we keep search less moves, it shoudl be enough
+    """
+    if len(board.history) < OPENING_MOVES_LIMIT:
+        return OPENING_DISTANCE
+    return MOVES_TO_CONSIDER_DIST
+
+
+def _move_wins_for(board: Board, move: Coord, as_player: int) -> bool:
+    """
+    True if as_player would win immediately by playing move now
+    """
+    original_turn = board.turn
+    board.turn = as_player
+    board.place(*move)
+    try:
+        we_want = as_player + 1
+        return (
+            board.check_line(board._get_xy_col(move[1])) == we_want
+            or board.check_line(board._get_xy_row(move[0])) == we_want
+            or board.check_line(board._get_xy_diag1(*move)) == we_want
+            or board.check_line(board._get_xy_diag2(*move)) == we_want
+        )
+    finally:
+        board.undo_move()
+        board.turn = original_turn
+
+
+def _order_moves_tactical(
+    board: Board,
+    player: int,
+    moves: list[Coord],
+    top_k: int | None = None,
+    state: SearchState | None = None,
+) -> list[Coord]:
+    """
+    Better move ordering for alpha-beta:
+      1 immediate wins
+      2 immediate blocks of opponents winning move
+      3 remaining moves sorted by history heuristic (if available)
+    """
+    winning_moves: list[Coord] = []
+    boring_moves: list[Coord] = []
+
+    for move in moves:
+        if _move_wins_for(board, move, player):
+            winning_moves.append(move)
+        else:
+            boring_moves.append(move)
+
+    if winning_moves:
+        return winning_moves
+
+    opponent = player ^ 1
+    opponent_winning_squares = {move for move in moves if _move_wins_for(board, move, opponent)}
+    blocking_moves: list[Coord] = []
+    quiet_after_blocks: list[Coord] = []
+
+    for move in moves:
+        if move in opponent_winning_squares:
+            blocking_moves.append(move)
+        else:
+            quiet_after_blocks.append(move)
+
+    if blocking_moves:
+        return blocking_moves
+
+    # sort quiet moves by history heuristic if state is availiable
+    if state is not None and state.history:
+        quiet_after_blocks.sort(key=lambda m: state.get_history_score(player, m), reverse=True)
+
+    if top_k is not None:
+        return quiet_after_blocks[:top_k]
+
+    return quiet_after_blocks
 
 
 def minimax(
     board: Board,
     depth: int,
     player: int,
-    curr_eval: int,
+    curr_eval: int | None = None,
     alpha=float("-inf"),
     beta=float("+inf"),
     deadline: float | None = None,
-    we_should_check: list[int] = [0],
+    state: SearchState | None = None,
 ) -> int | float:
     """
     MAX = 0, bily neb se zvysujici se eval_line vyhrava bily vice
@@ -187,13 +291,33 @@ def minimax(
         a = -1 if a == 2 else a
         return a * WIN_CONSTANT  # mega velke cislo ktere prebije cokoliv jineho co je realen mozne dostat evaluaci herni plochy
 
+    if curr_eval is None:
+        curr_eval = eval_board(board, COMPLETE_PATTERNS)
+
     # if we reached final depth -> return static eval
     if depth == 0:
         return curr_eval
 
-    check_time(deadline, we_should_check)
+    if state is None:
+        state = SearchState()
 
-    possible_moves = get_candidate_moves(board=board, distance=MOVES_TO_CONSIDER_DIST)
+    # if we are past deadline, please tell everyone WeAreSlow and kill us
+    check_time(deadline, state.counter)
+
+    possible_moves = get_candidate_moves(board=board, distance=_candidate_distance(board))
+
+    # we apply the "advanced tactical ordering" on leaves forcing the moves
+    if depth <= 1:
+        possible_moves = _order_moves_tactical(
+            board=board,
+            player=player,
+            moves=possible_moves,
+            top_k=TOP_K_MOVES,
+            state=state,
+        )
+    elif state.history:
+        # for deeper nodes, just sort by history (no tactical check overhead)
+        possible_moves.sort(key=lambda m: state.get_history_score(player, m), reverse=True)
 
     for move in possible_moves:
         # evaluating 4 affected lines by the new move
@@ -212,10 +336,9 @@ def minimax(
                 alpha=alpha,
                 beta=beta,
                 deadline=deadline,
-                we_should_check=we_should_check,
+                state=state,
             )
-        finally:
-            # undo move musi byt vzdy, i kdyz WeAreSlow
+        finally:  # undo move musi byt vzdy, i kdyz WeAreSlow
             board.undo_move()
 
         # what we found out
@@ -223,11 +346,13 @@ def minimax(
             # MAX
             alpha = max(alpha, evaluation)
             if alpha >= beta:  # MIN isn't dumb - won't go here -> no need to calculate -> break
+                state.update_history(player, move, depth)
                 break
         else:
             # MIN
             beta = min(beta, evaluation)
             if beta <= alpha:  # MAX has better branch than this -> break
+                state.update_history(player, move, depth)
                 break
 
     return alpha if player == 0 else beta
@@ -237,11 +362,28 @@ def get_best_move(
     board: Board,
     player: int,
     depth: int,
-    we_should_check: list[int] = [0],  # protoze aby se presouvala reference, ne hodnota
     deadline: float | None = None,
+    pv_move: Coord | None = None,
+    state: SearchState | None = None,
 ) -> Coord:
+    if state is None:
+        state = SearchState()
+
     best_eval = float("inf") * (-1 if player == 0 else 1)
-    possible_moves = get_candidate_moves(board=board, distance=MOVES_TO_CONSIDER_DIST)
+    possible_moves = get_candidate_moves(board=board, distance=_candidate_distance(board))
+    possible_moves = _order_moves_tactical(
+        board=board,
+        player=player,
+        moves=possible_moves,
+        state=state,
+    )
+
+    # if we got the best move from previous iteration of get_best_move,
+    # then we will check it first thing
+    if pv_move in possible_moves:
+        possible_moves.pop(possible_moves.index(pv_move))
+        possible_moves = [pv_move] + possible_moves
+
     best_move = None
 
     our_alpha, our_beta = float("-inf"), float("+inf")
@@ -254,7 +396,6 @@ def get_best_move(
         try:
             after = eval_move(board, *move, patterns=COMPLETE_PATTERNS)
             e_delta = after - before
-            # we dont pass alpha/beta cuz its the start, we have no values
             evaluation = minimax(
                 board,
                 player=player ^ 1,
@@ -263,7 +404,7 @@ def get_best_move(
                 alpha=our_alpha,
                 beta=our_beta,
                 deadline=deadline,
-                we_should_check=we_should_check,
+                state=state,
             )
         finally:
             board.undo_move()
@@ -291,11 +432,16 @@ def iterative_deepening(board: Board, player: int, given_time: int = 10) -> tupl
     deadline = start + given_time + 0.5
     depth = 0
 
-    # TEST: HAVE TO TEST this shit
+    # shared state across all depths - history heuristic accumulates
+    state = SearchState()
+
     while time.time() < deadline:
         depth += 1
         try:
-            new_move = get_best_move(board, player, depth, deadline=deadline)
+            if best_move is not None:
+                new_move = get_best_move(board, player, depth, deadline=deadline, pv_move=best_move, state=state)
+            else:
+                new_move = get_best_move(board, player, depth, deadline=deadline, state=state)
         except WeAreSlow:
             depth -= 1
             break

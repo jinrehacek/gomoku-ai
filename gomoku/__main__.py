@@ -1,8 +1,9 @@
-from rich.text import Text
-from gomoku.board import Board
-from gomoku.io import human_move, ai_swap, ai_move, ai_vs_ai_swap, cons, human_swap, redraw_board, pick_mode_and_swap
 import argparse
 
+from rich.text import Text
+
+from gomoku.board import Board
+from gomoku.io import ai_move, ai_swap, ai_vs_ai_swap, cons, human_move, human_swap, pick_mode_and_swap, redraw_board
 
 parser = argparse.ArgumentParser(description="Gomoku game and AI playable in terminal")
 parser.add_argument("-s", "--size", help="Set size of board (default is 15)", type=int, default=15)
@@ -14,6 +15,8 @@ parser.add_argument("--swap", help="Who does Swap2 (1) You, (2) AI", type=int, d
 
 
 args = parser.parse_args()
+
+# Making sure arguments are sensible values
 if args.time < 1:
     raise Exception("Negative or extremely small time given. Please try again!")
 if args.fixed < 0:
@@ -24,6 +27,43 @@ if args.win < 1:
     raise Exception("Absurd win lenght, please be for real!")
 
 assert args.swap in [0, 1, 2]
+
+
+def play_human_vs_ai(board: Board, human_player):
+    while True:
+        if board.turn == human_player:
+            human_move(board)
+            state = board.is_over()
+            if state > 0:
+                cons.print(
+                    Text(
+                        "Human Won",
+                        style="bold blink",
+                    )
+                )
+                break
+        else:
+            ai_move(board, time_limit=args.time, fixed=args.fixed)
+            state = board.is_over()
+            if state > 0:
+                cons.print(
+                    "[bold blink red]🤖 The ROBOT Won 🤖[/bold blink red] "
+                    "[bold blink white]it's over for humanity.[/bold blink white]"
+                )
+                break
+
+
+def play_ai_vs_ai(board: Board):
+    ai_vs_ai_swap(board, time_limit=args.time, fixed=args.fixed)
+    while True:
+        ai_move(board, time_limit=args.time, fixed=args.fixed)
+        state = board.is_over()
+        if state > 0:
+            cons.print(
+                "[bold blink red]🤖 One ROBOT Won 🤖[/bold blink red] "
+                "[bold blink white]the silicon wars are over.[/bold blink white]"
+            )
+            break
 
 
 def main():
@@ -45,42 +85,15 @@ def main():
         human_player = ai_swap(board, time_limit=args.time, fixed=args.fixed)
     else:
         human_player = None
-    redraw_board(board)
 
+    # AI vs. AI mode
     if mode == 2:
-        ai_vs_ai_swap(board, time_limit=args.time, fixed=args.fixed)
-        while True:
-            ai_move(board, time_limit=args.time, fixed=args.fixed)
-            state = board.is_over()
-            if state > 0:
-                cons.print(
-                    "[bold blink red]🤖 One ROBOT Won 🤖[/bold blink red] "
-                    "[bold blink white]the silicon wars are over.[/bold blink white]"
-                )
-                break
+        play_ai_vs_ai(board)
         return
 
-    while True and mode == 1:
-        if board.turn == human_player:
-            human_move(board)
-            state = board.is_over()
-            if state > 0:
-                cons.print(
-                    Text(
-                        "Human Won",
-                        style="bold blink",
-                    )
-                )
-                break
-        else:
-            ai_move(board, time_limit=args.time, fixed=args.fixed)
-            state = board.is_over()
-            if state > 0:
-                cons.print(
-                    "[bold blink red]🤖 The ROBOT Won 🤖[/bold blink red] "
-                    "[bold blink white]it's over for humanity.[/bold blink white]"
-                )
-                break
+    # Human vs. AI mode
+    redraw_board(board)
+    play_human_vs_ai(board, human_player)
 
 
 if __name__ == "__main__":

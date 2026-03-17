@@ -1,24 +1,28 @@
-# MY RICH IMPORTS
+# stlib imports
+import re
+import time
+from random import randint
 from typing import Literal, cast
-from rich.text import Text
-from rich.console import Console
-from rich.table import Table
+
+# MY RICH IMPORTS
 from rich.box import MINIMAL as TABLE_STYLE
+from rich.console import Console
 from rich.prompt import Prompt
+from rich.table import Table
+from rich.text import Text
 
 # GOMOKU imports
 from gomoku.board import Board, Coord, Player
-from gomoku.engine import COMPLETE_PATTERNS, eval_board, iterative_deepening, get_best_move, minimax
-
-import time
-import re
-from random import randint
+from gomoku.engine import COMPLETE_PATTERNS, eval_board, get_best_move, iterative_deepening, minimax
 
 # the main hero, bridges stdout with whatever shit i have
 cons = Console()
 
 
 def create_table(board: Board) -> Table:
+    """
+    takes board and creates the nice looking printable "table" that gets printed to term
+    """
     size = board.LENGTH
     grid = Table(show_header=False, show_edge=False, show_lines=True, box=TABLE_STYLE)
 
@@ -51,14 +55,21 @@ def create_table(board: Board) -> Table:
     return grid
 
 
+# regex for validating coordinate format
 validation_pattern = re.compile(r"^[A-Za-z]\d{1,2}$")
 
 
 def valid_input(s: str) -> bool:
+    """
+    using regex validates if given str is in format like a5
+    """
     return bool(validation_pattern.fullmatch(s))
 
 
 def board_coords_to_xy(s: str, board: Board) -> Coord | Literal[False]:
+    """
+    takes str from the input and converts to Coord on the board, also validates its in bounds
+    """
     if not valid_input(s):
         return False
 
@@ -75,15 +86,27 @@ def board_coords_to_xy(s: str, board: Board) -> Coord | Literal[False]:
 
 
 def redraw_board(board: Board):
+    """
+    redraws the board in terminal
+    do this for new move to appear
+    """
     cons.clear()
     board_table = create_table(board)
     cons.print(board_table)
 
 
 def get_inp_num(message: str, ok_nums: list[int]):
+    """
+    helper func for getting input number (as answer when persented with choice) that also validates \\
+    its one of the valid options
+    """
     while True:
         s = Prompt.ask(Text(message))
-        num = int(s.strip())
+        try:
+            num = int(s.strip())
+        except ValueError:
+            cons.print("[orange_red1] Wrong input, please try again.")
+            continue
         if num in ok_nums:
             return num
         else:
@@ -109,15 +132,17 @@ def pick_mode_and_swap() -> tuple[int, int]:
 
 
 def computer_chooses_side(board: Board, time_limit: int, fixed: int) -> Player:
+    """
+    when AI presented with situation after user has set-up Swap-2 to choose side
+    currenlty never chooses to add more stones
+    """
     current_player = cast(Player, board.turn)
     opening_eval = minimax(board, 4, current_player, curr_eval=eval_board(board, COMPLETE_PATTERNS))
 
     if opening_eval > 0:
         ai_player = cast(Player, 0)
-    elif opening_eval <= 0:
-        ai_player = cast(Player, 1)
     else:
-        ai_player = current_player
+        ai_player = cast(Player, 1)
 
     human_player = cast(Player, ai_player ^ 1)
 
@@ -147,12 +172,12 @@ def human_swap(board: Board, time_limit: int, fixed: int) -> Player:
             cons.print("[orange_red1]Wrong input or occupied square. Please try again.")
             continue
         else:
-            b1, b2, w1 = c
+            b1, b2, w1 = cast(tuple[Coord, Coord, Coord], c)
             break
 
-    board.place(*b1)  # pyright: ignore
-    board.place(*w1)  # pyright: ignore
-    board.place(*b2)  # pyright: ignore
+    board.place(b1[0], b1[1])
+    board.place(w1[0], w1[1])
+    board.place(b2[0], b2[1])
     redraw_board(board)
 
     return computer_chooses_side(board, time_limit, fixed)
@@ -163,7 +188,7 @@ def ai_swap(board: Board, time_limit: int, fixed: int) -> Player:
     half = lght // 4
     board.place(half, half)
     board.place(lght // 2 + randint(-half, half), lght // 2)
-    board.place(lght - half, lght - half + randint(-half, half))
+    board.place(lght - half - 1, lght - half - 1 + randint(-half, half))
     redraw_board(board)
 
     cons.print(Text("Do you want to play this position as (1) cross/X, (2) circle/O or (3) add two more stones?"))
@@ -194,11 +219,11 @@ def ai_swap(board: Board, time_limit: int, fixed: int) -> Player:
             cons.print("[orange_red1]Wrong input or occupied square. Please try again.")
             continue
         else:
-            b1, w1 = c
+            b1, w1 = cast(tuple[Coord, Coord], c)
             break
 
-    board.place(*b1)  # pyright: ignore
-    board.place(*w1)  # pyright: ignore
+    board.place(b1[0], b1[1])
+    board.place(w1[0], w1[1])
     redraw_board(board)
 
     return computer_chooses_side(board, time_limit, fixed)
@@ -209,7 +234,7 @@ def ai_vs_ai_swap(board: Board, time_limit: int, fixed: int):
     half = lght // 4
     board.place(half, half)
     board.place(lght // 2 + randint(-half, half), lght // 2)
-    board.place(lght - half, lght - half + randint(-half, half))
+    board.place(lght - half - 1, lght - half - 1 + randint(-half, half))
     redraw_board(board)
 
     current_player = cast(Player, board.turn)
@@ -217,10 +242,8 @@ def ai_vs_ai_swap(board: Board, time_limit: int, fixed: int):
 
     if opening_eval > 0:
         ai_player = cast(Player, 0)
-    elif opening_eval <= 0:
-        ai_player = cast(Player, 1)
     else:
-        ai_player = current_player
+        ai_player = cast(Player, 1)
 
     if ai_player == current_player:
         cons.print("Second AI chose the side to move now.")

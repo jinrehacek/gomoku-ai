@@ -1,7 +1,6 @@
 # Default values for the Board
 from typing import Literal
 
-
 WHITE_TURN, BLACK_TURN = 0, 1
 WHITE_STONE, BLACK_STONE = 1, 2
 SIZE = 15
