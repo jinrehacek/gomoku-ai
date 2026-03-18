@@ -50,7 +50,7 @@ def _immediate_neighbors(x, y, distance: int, board_size: int) -> Generator[Coor
     """
     generates immediate neighbors of given square within some given distance
     """
-    VALS = range(-distance, distance + 1)  # apparently possible
+    VALS = range(-distance, distance + 1)
     for i in VALS:
         for j in VALS:
             if i == j == 0:
@@ -198,8 +198,8 @@ def eval_move(board: Board, x: int, y: int, patterns: SearchPatternsDict) -> int
     we look only at two diagonals, 1 row & 1 col - those whose part is the move we just played
     row & col is sliced so it just cares about slice big enough around such it fits every pattern
     """
-    d_row = eval_line(board._get_xy_row(x)[max(0, x - EVAL_MOVE_SLICE_HALF) : x + EVAL_MOVE_SLICE_HALF + 1], patterns)
-    d_col = eval_line(board._get_xy_col(y)[max(0, y - EVAL_MOVE_SLICE_HALF) : y + EVAL_MOVE_SLICE_HALF + 1], patterns)
+    d_row = eval_line(board._get_xy_row(x)[max(0, y - EVAL_MOVE_SLICE_HALF) : y + EVAL_MOVE_SLICE_HALF + 1], patterns)
+    d_col = eval_line(board._get_xy_col(y)[max(0, x - EVAL_MOVE_SLICE_HALF) : x + EVAL_MOVE_SLICE_HALF + 1], patterns)
     d_diag1 = eval_line(board._get_xy_diag1(x, y), patterns)
     d_diag2 = eval_line(board._get_xy_diag2(x, y), patterns)
     suma = d_col + d_diag1 + d_diag2 + d_row

@@ -60,6 +60,10 @@ class Board:
         """
         returns True when stone in every square
         """
+        #
+        # if 0 < len(self.history) < self.LENGTH**2:
+        #     return False
+        #
         for x in range(self.LENGTH):
             for y in range(self.LENGTH):
                 if self.data[x][y] == 0:
