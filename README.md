@@ -1,21 +1,29 @@
-# Zápočtový program
-
-*Tento soubor vhodně upravte. Text psaný kurzívou označuje instrukce pro vás, před odevzdáním ho smažte.*
+# Gomoku - zápočtový program
 
 ## Specifikace
-
-*Sem napište stručnou specifikaci vašeho programu - co váš program dělá (podobně, jako jste mi psali do mailu). Stačí zhruba 1 odstavec.*
+Program implementuje deskovou hru Gomoku v terminálu (TUI přes knihovnu Rich), včetně režimů Human vs AI a AI vs AI. Herní AI používá minimax s alpha-beta prořezáváním, iterativní prohlubování a heuristické hodnocení pozice pomocí patternů.
 
 ## Instalace a spuštění
+1. Vytvořte a aktivujte virtuální prostředí.
+2. Nainstalujte projekt: 
 
-*Pokud je váš program v Pythonu, stačí upravit JMENO_HLAVNIHO_SOUBORU níže a případně doplnit další informace ke spuštění (jestli má nějaké parametry, vstupní soubory, ...). Pokud je parametrů hodně nebo je potřeba nějaký speciální formát vstupních souborů, nechte tuto sekci jen stručnou a podrobněji to popište v uživatelské dokumentaci (a sem dejte odkaz). Pokud je program v jiném programovacím jazyce, tuto sekci vhodně upravte, abych byl při kontrole schopen nainstalovat si potřebné nástroje a program spustit.*
+`pip3 install -e .`
 
-Program se spustí příkazem: `python JMENO_HLAVNIHO_SOUBORU.py`
+3. Spusťte hru:
+
+`python -m gomoku`
+
+Základní parametry:
+- `-s`, `--size` velikost desky (výchozí 15)
+- `-w`, `--win` délka výherní řady (výchozí 5)
+- `-t`, `--time` čas na tah AI v sekundách (výchozí 10)
+- `-f`, `--fixed` fixní hloubka místo časového limitu
+- `-m`, `--ai` režim AI vs AI
+- `--swap` kdo provádí Swap-2 setup (`1` člověk, `2` AI)
+
+Podrobnější popis ovládání je v uživatelské dokumentaci.
 
 ## Dokumentace
-
-*Tady bude rozcestník k dokumentaci k vašemu programu. Pokud je to potřeba, upravte odkazy na soubory s dokumentací. Nebo pokud nepíšete dokumentaci v Markdownu, tak sem napište, kde dokumentaci najdu.*
-
-* [Uživatelská dokumentace](docs/user.md)
-* [Ukázky použití](docs/examples.md)
-* [Programátorská dokumentace](docs/programmer.md)
+- [Uživatelská dokumentace](docs/user.md)
+- [Ukázky použití](docs/examples.md)
+- [Programátorská dokumentace](docs/programmer.md)

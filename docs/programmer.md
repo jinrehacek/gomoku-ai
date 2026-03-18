@@ -92,4 +92,5 @@ Soubor `__main__.py` je vstupní bod aplikace (`python -m gomoku`) a drží hlav
   - vytvoří desku, zvolí režim, provede Swap-2 fázi a spustí odpovídající herní smyčku
 
 
-
+## Testovani
+Pro potřeby testování je použit framework **pytest**, nutná jeho instalace 
