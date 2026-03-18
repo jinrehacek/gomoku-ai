@@ -1,17 +1,17 @@
-# Gomoku - zápočtový program
+# Gomoku AI - zápočtový program
 
 ## Specifikace
 Program implementuje deskovou hru Gomoku v terminálu (TUI přes knihovnu Rich), včetně režimů Human vs AI a AI vs AI. Herní AI používá minimax s alpha-beta prořezáváním, iterativní prohlubování a heuristické hodnocení pozice pomocí patternů.
 
 ## Instalace a spuštění
-1. Vytvořte a aktivujte virtuální prostředí.
-2. Nainstalujte projekt: 
+1. Vytvořte a aktivujte virtuální prostředí. (Doporučeno, například pomocí python3-venv)
+2. Nainstalujte projekt/dependencies: 
 
-`pip3 install -e .`
+`pip3 install .` jediná dependency je package Rich
 
 3. Spusťte hru:
 
-`python -m gomoku`
+`python gomoku`
 
 Základní parametry:
 - `-s`, `--size` velikost desky (výchozí 15)
