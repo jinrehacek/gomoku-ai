@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "gomoku"
 version = "0.1"
-dependencies = ["rich"]
+dependencies = ["textual>=0.66.0", "textual-serve>=1.1.3"]
 
 [project.optional-dependencies]
 dev = ["pytest", "ruff"]
@@ -13,3 +13,6 @@ dev = ["pytest", "ruff"]
 [tool.ruff]
 lint.ignore = ["F841", "E701", "E702"]
 line-length = 128
+
+[tool.setuptools.packages.find]
+include = ["gomoku*"]

@@ -1,99 +1,90 @@
 import argparse
+import os
 
-from rich.text import Text
-
-from gomoku.board import Board
-from gomoku.io import ai_move, ai_swap, ai_vs_ai_swap, cons, human_move, human_swap, pick_mode_and_swap, redraw_board
-
-parser = argparse.ArgumentParser(description="Gomoku game and AI playable in terminal")
-parser.add_argument("-s", "--size", help="Set size of board (default is 15)", type=int, default=15)
-parser.add_argument("-w", "--win", help="Set winning stones lenght", type=int, default=5)
-parser.add_argument("-t", "--time", help="Seconds to think (1 or more)", type=int, default=10)
-parser.add_argument("-f", "--fixed", help="If given sets minimax to fixed depth & ignores time limit", type=int, default=0)
-parser.add_argument("-m", "--ai", help="AI vs. AI mode", action="store_true")
-parser.add_argument("--swap", help="Who does Swap2 (1) You, (2) AI", type=int, default=0)
+from gomoku.tui import GomokuApp
+from gomoku.web import GomokuServer
 
 
-args = parser.parse_args()
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Gomoku game with Textual UI")
+    parser.add_argument("-s", "--size", help="Set size of board (default is 15)", type=int, default=15)
+    parser.add_argument("-w", "--win", help="Set winning stones length", type=int, default=5)
+    parser.add_argument("-t", "--time", help="Seconds to think (1 or more)", type=int, default=10)
+    parser.add_argument(
+        "-f",
+        "--fixed",
+        help="If given sets minimax to fixed depth and ignores time limit",
+        type=int,
+        default=0,
+    )
+    parser.add_argument("-m", "--ai", help="AI vs AI mode", action="store_true")
+    parser.add_argument("--swap", help="Who does Swap2 (1) You, (2) AI, (0) random", type=int, default=0)
+    parser.add_argument(
+        "--serve",
+        help="Serve the Textual app over HTTP for browser clients",
+        action="store_true",
+    )
+    parser.add_argument("--host", help="Host for --serve mode", type=str, default="0.0.0.0")
+    parser.add_argument("--port", help="Port for --serve mode", type=int, default=8000)
+    parser.add_argument(
+        "--url",
+        help="Public URL for reverse proxies. Can also be set via PUBLIC_URL env var.",
+        type=str,
+        default=os.environ.get("PUBLIC_URL"),
+    )
 
-# Making sure arguments are sensible values
-if args.time < 1:
-    raise Exception("Negative or extremely small time given. Please try again!")
-if args.fixed < 0:
-    raise Exception("Negative fixed depth given. Are you joking, or mentally challenged?")
-if args.size < 2:
-    raise Exception("Absurd size of board given. Don't do that again. Thx")
-if args.win < 1:
-    raise Exception("Absurd win lenght, please be for real!")
+    args = parser.parse_args()
 
-assert args.swap in [0, 1, 2]
+    if args.time < 1:
+        raise Exception("Negative or extremely small time given. Please try again!")
+    if args.fixed < 0:
+        raise Exception("Negative fixed depth given.")
+    if args.size < 2:
+        raise Exception("Absurd size of board given.")
+    if args.win < 1:
+        raise Exception("Absurd win length, please be for real!")
+    if args.swap not in [0, 1, 2]:
+        raise Exception("Swap must be 0, 1 or 2.")
+    if args.port < 1 or args.port > 65535:
+        raise Exception("Port must be between 1 and 65535.")
 
-
-def play_human_vs_ai(board: Board, human_player):
-    while True:
-        if board.turn == human_player:
-            human_move(board)
-            state = board.is_over()
-            if state > 0:
-                cons.print(
-                    Text(
-                        "Human Won",
-                        style="bold blink",
-                    )
-                )
-                break
-        else:
-            ai_move(board, time_limit=args.time, fixed=args.fixed)
-            state = board.is_over()
-            if state > 0:
-                cons.print(
-                    "[bold blink red]🤖 The ROBOT Won 🤖[/bold blink red] "
-                    "[bold blink white]it's over for humanity.[/bold blink white]"
-                )
-                break
-
-
-def play_ai_vs_ai(board: Board):
-    ai_vs_ai_swap(board, time_limit=args.time, fixed=args.fixed)
-    while True:
-        ai_move(board, time_limit=args.time, fixed=args.fixed)
-        state = board.is_over()
-        if state > 0:
-            cons.print(
-                "[bold blink red]🤖 One ROBOT Won 🤖[/bold blink red] "
-                "[bold blink white]the silicon wars are over.[/bold blink white]"
-            )
-            break
+    return args
 
 
-def main():
-    board = Board(size=args.size, win_len=args.win)
+def main() -> None:
+    args = parse_args()
+    mode = 2 if args.ai else 1
 
-    # Getting user's choice on mode and swap
-    if not args.ai and not args.swap:
-        mode, swap_maker = pick_mode_and_swap()
-    elif args.swap and not args.ai:
-        swap_maker = args.swap
-        mode = 1
-    else:
-        mode, swap_maker = 2, 0
+    if args.serve:
+        command = (
+            f"python -m gomoku --size {args.size} --win {args.win} --time {args.time} --fixed {args.fixed} --swap {args.swap}"
+        )
+        if mode == 2:
+            command += " --ai"
+            
+        public_url = args.url if args.url else f"http://{args.host}:{args.port}"
+        public_url = public_url.rstrip("/")
 
-    # Swap2 Handling
-    if swap_maker == 1:
-        human_player = human_swap(board, args.time, args.fixed)
-    elif swap_maker == 2:
-        human_player = ai_swap(board, time_limit=args.time, fixed=args.fixed)
-    else:
-        human_player = None
-
-    # AI vs. AI mode
-    if mode == 2:
-        play_ai_vs_ai(board)
+        server = GomokuServer(
+            command=command,
+            host=args.host,
+            port=args.port,
+            title="Gomoku",
+            public_url=public_url,
+            default_font_size=14,
+        )
+        server.serve()
         return
 
-    # Human vs. AI mode
-    redraw_board(board)
-    play_human_vs_ai(board, human_player)
+    app = GomokuApp(
+        size=args.size,
+        win_len=args.win,
+        time_limit=args.time,
+        fixed=args.fixed,
+        mode=mode,
+        swap=args.swap,
+    )
+    app.run()
 
 
 if __name__ == "__main__":

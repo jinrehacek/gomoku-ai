@@ -1,6 +1,3 @@
-import pytest
-
-import rich
 import gomoku.io as io
 from gomoku.board import Board
 
@@ -34,19 +31,7 @@ def test_board_coords_to_xy_invalid_values():
     assert io.board_coords_to_xy("a1", b) is False
 
 
-def test_create_table_basic_shape():
-    b = Board(size=4, win_len=3)
-    table = io.create_table(b)
-
-    # row/col labels included
-    assert len(table.columns) == 5
-    assert len(table.rows) == 5
-
-
-def test_create_table_highlight_last_move():
-    b = Board(size=4, win_len=3)
-    b.place(1, 2)
-
-    table = io.create_table(b)
-    assert table.rows[2].style == "orange_red1"
-    assert table.columns[3].style == "orange_red1"
+def test_xy_to_board_coords():
+    assert io.xy_to_board_coords(0, 0) == "a1"
+    assert io.xy_to_board_coords(1, 2) == "c2"
+    assert io.xy_to_board_coords(14, 14) == "o15"

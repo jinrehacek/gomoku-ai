@@ -1,42 +1,70 @@
-# Uživatelská dokumentace
+# Uzivatelska dokumentace
 
-## Spuštění
-Program se spouští příkazem:
+## Spusteni
+Program se spousti prikazem:
 
-`python gomoku`
+`python -m gomoku`
 
-Volitelné argumenty:
-- `-s`, `--size` velikost desky (výchozí 15)
-- `-w`, `--win` délka výherní řady (výchozí 5)
-- `-t`, `--time` čas na tah AI v sekundách (výchozí 10)
-- `-f`, `--fixed` fixní hloubka minimaxu (pokud je > 0, ignoruje čas)
-- `-m`, `--ai` režim AI vs AI
-- `--swap` kdo provádí Swap-2 setup (`1` hráč, `2` AI)
+Volitelne argumenty:
+- `-s`, `--size` velikost desky (vychozi 15)
+- `-w`, `--win` delka vyherni rady (vychozi 5)
+- `-t`, `--time` cas na tah AI v sekundach (vychozi 10)
+- `-f`, `--fixed` fixni hloubka minimaxu (pokud je > 0, ignoruje cas)
+- `-m`, `--ai` rezim AI vs AI
+- `--swap` kdo provadi Swap-2 setup (`0` random, `1` hrac, `2` AI)
 
+## Ovladani
+- Klik mysi na pole = polozeni kamene
+- Sipky nebo WASD = pohyb kurzoru
+- Enter / Space = polozeni na kurzor
+- `1` / `2` / `3` = volba v kontextu Swap-2 faze
+- `P` = pauza nebo pokracovani AI vs AI
+- `R` = restart hry
+- `Q` = ukonceni aplikace
 
-## Ovládání
-- Souřadnice se zadávají ve formátu `písmeno+číslo`, např. `a1`, `g8`, `h12`.
-- Písmeno určuje sloupec, číslo určuje řádek.
-- Po každém tahu se deska znovu vykreslí v terminálu.
-
-
-## Režimy hry
-- **Člověk vs AI**
-  - hraje člověk proti počítači
-  - při spuštění bez `-m` se režim volí interaktivně
+## Rezimy hry
+- **Clovek vs AI**
+  - hraje clovek proti pocitaci
+  - pri `--swap 0` se zvoli nahodne, kdo nastavuje Swap-2
 - **AI vs AI**
-  - obě strany hraje AI
-  - spouští se přepínačem `-m`
+  - obe strany hraje AI
+  - spousti se prepinacem `-m`
+  - lze pozastavit klavesou `P`
 
 ## Swap-2
-V programu se hraje Gomoku podle turnajových pravidel, která eliminují jistou výhru začínajícího hráče. Začít Swap2 může buď hráč nebo počítač. Nutno upozornit, že není implementována možnost, kde počítač položí další dva kameny. Více o Swap2 se dočtete [zde](https://cs.wikipedia.org/wiki/SWAP).
+Podporovane jsou oba setup proudy:
+- Human setup 3 kameny (X, O, X)
+- AI setup + volba strany / pridani 2 kamenu
 
-## Příklady spuštění
-- Základní hra:
-  - `python gomoku`
+Poznamka: AI stale nepouziva variantu, kdy AI sama aktivne vybira pridani dalsich 2 kamenu.
+
+## Browser mode
+Program lze vystavit do browseru:
+
+`python -m gomoku --serve --host 0.0.0.0 --port 8000`
+
+Potom otevri:
+
+`http://<server-ip>:8000`
+
+## Nasazeni pres Docker a Reverse Proxy (VPS)
+Pro nasazeni na VPS s reverse proxy (např. Nginx, Caddy) muzes vyuzit pribaleny `Dockerfile`.
+Pokud aplikace bezi za HTTPS domenou, je nutne nastavit spravnou verejnou URL, aby fungovaly websockety:
+
+`docker build -t gomoku .`
+`docker run -p 8000:8000 -e PUBLIC_URL="https://tvoje-domena.cz" gomoku`
+
+Nebo pri spusteni Pythonu:
+`python -m gomoku --serve --host 0.0.0.0 --port 8000 --url https://tvoje-domena.cz`
+
+## Priklady spusteni
+- Zakladni hra:
+  - `python -m gomoku`
 - AI vs AI:
-  - `python gomoku --ai`
-- Větší deska a delší čas:
-  - `python gomoku -size 19 --time 20`
-- Fixní hloubka místo času:
-  - `python gomoku --fixed 3`
+  - `python -m gomoku --ai`
+- Vetsi deska a delsi cas:
+  - `python -m gomoku --size 19 --time 20`
+- Fixni hloubka misto casu:
+  - `python -m gomoku --fixed 3`
+- Browser mode:
+  - `python -m gomoku --serve --host 0.0.0.0 --port 8000`
