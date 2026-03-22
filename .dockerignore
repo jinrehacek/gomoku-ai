@@ -9,3 +9,8 @@ htmlcov/
 venv/
 .venv/
 bordel/
+*.egg-info/
+build/
+dist/
+.coverage
+test/
