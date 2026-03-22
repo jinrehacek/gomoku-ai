@@ -1,4 +1,5 @@
 import pytest
+import time
 from gomoku.board import Board
 import gomoku.engine as eng
 from gomoku.engine import (
@@ -7,6 +8,7 @@ from gomoku.engine import (
     _candidate_distance,
     _move_wins_for,
     _order_moves_tactical,
+    _zobrist_hash,
     black_stones_eq,
     SearchState,
     check_time,
@@ -261,6 +263,40 @@ def test_minimax_updates_history():
         state=state,
     )
     assert len(state.history) >= 1
+
+
+def test_zobrist_hash_depends_on_side_to_move():
+    b = Board(size=7, win_len=5)
+    b.place(3, 3)
+    b.place(3, 4)
+
+    h_white = _zobrist_hash(b, player=0)
+    h_black = _zobrist_hash(b, player=1)
+
+    assert h_white != h_black
+
+
+def test_transposition_table_is_filled_and_reused():
+    b = Board(size=7, win_len=5)
+    b.place(3, 3)
+    b.place(2, 3)
+    b.place(3, 4)
+    b.place(2, 4)
+
+    state = SearchState()
+    base_eval = eval_board(b, COMPLETE_PATTERNS)
+
+    deadline = time.time() + 60
+
+    first = minimax(b, depth=2, player=b.turn, curr_eval=base_eval, state=state, deadline=deadline)
+    assert len(state.tt) > 0
+
+    before_counter = state.counter[0]
+    second = minimax(b, depth=2, player=b.turn, curr_eval=base_eval, state=state, deadline=deadline)
+    after_counter = state.counter[0]
+
+    assert first == second
+    assert after_counter == before_counter + 1
 
 
 def test_get_best_move_with_pv_move():

@@ -70,7 +70,7 @@ class Board:
                     return False
         return True
 
-    def check_line(self, inp_line: list[int], IN_ROW=None) -> int:
+    def check_line(self, line: list[int], IN_ROW=None) -> int:
         """
         checks if there is a win in given line (row, col, diagonal)
         0: no win
@@ -79,20 +79,28 @@ class Board:
         """
         if IN_ROW is None:
             IN_ROW = self.WINNING_LENGTH
-        size = len(inp_line)
-        line = inp_line + [0, 0]
+        
         together = 0
-        for i in range(size + 1):
-            if together == IN_ROW and line[i] != line[i - 1]:
-                return line[i - 1]
-
-            if i == 0 and line[i]:
-                together = 1
-            elif line[i]:
-                if line[i - 1] == line[i]:
+        last = 0
+        for i in range(len(line)):
+            x = line[i]
+            if x != 0:
+                if x == last:
                     together += 1
                 else:
+                    if together == IN_ROW:
+                        return last
+                    last = x
                     together = 1
+            else:
+                if together == IN_ROW:
+                    return last
+                last = 0
+                together = 0
+                
+        if together == IN_ROW:
+            return last
+            
         return 0
 
     def _get_xy_row(self, x: int) -> list[int]:
