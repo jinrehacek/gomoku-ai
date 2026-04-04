@@ -61,7 +61,7 @@ def main() -> None:
         )
         if mode == 2:
             command += " --ai"
-            
+
         public_url = args.url if args.url else f"http://{args.host}:{args.port}"
         public_url = public_url.rstrip("/")
 
@@ -71,7 +71,7 @@ def main() -> None:
             port=args.port,
             title="Gomoku",
             public_url=public_url,
-            default_font_size=14,
+            default_font_size=11,
         )
         server.serve()
         return
