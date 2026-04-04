@@ -1,3 +1,0 @@
-gomoku.rehacek.me {
-    reverse_proxy gomoku:8000
-}
