@@ -15,7 +15,7 @@ class GomokuServer(Server):
         port: int = 8000,
         title: str | None = None,
         public_url: str | None = None,
-        default_font_size: int = 11,
+        default_font_size: int = 15,
     ):
         super().__init__(
             command=command,

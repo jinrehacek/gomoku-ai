@@ -13,7 +13,7 @@ from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.events import MouseDown
 from textual.screen import ModalScreen
-from textual.widgets import Footer, Header, Static, Button, Label
+from textual.widgets import Footer, Static, Button, Label
 
 from gomoku.board import Board, Coord, Player
 from gomoku.engine import COMPLETE_PATTERNS, eval_board, get_best_move, iterative_deepening, minimax
@@ -194,8 +194,8 @@ class GomokuApp(App):
     }
 
     #sidebar {
-        width: 32;
-        min-width: 30;
+        width: 34;
+        min-width: 32;
         height: 100%;
         border: round #7aa2f7;
         background: #1f2440;
@@ -289,7 +289,7 @@ class GomokuApp(App):
         self.last_ai_stats = ""
 
     def compose(self) -> ComposeResult:
-        yield Header(show_clock=True)
+        # yield Header(show_clock=True)
         with Horizontal(id="main"):
             yield BoardView(id="board")
             with Vertical(id="sidebar"):
@@ -459,7 +459,7 @@ class GomokuApp(App):
         if self.phase == "choose_swap":
             if choice == 3:
                 choice = randint(1, 2)
-            
+
             if choice == 1:
                 self.phase = "human_swap_3"
                 self.info_message = "Swap-2: place 3 stones by clicking cells (X, O, X)."
@@ -665,8 +665,10 @@ class GomokuApp(App):
             human_side = "Not chosen"
 
         mode_text = "Human vs AI" if self.mode == 1 else "AI vs AI"
-        
-        status = Text.from_markup(f"[bold underline]Game Info[/]\n\nMode:  {mode_text}\nPhase: {self.phase}\nTurn:  {turn_text}\n")
+
+        status = Text.from_markup(
+            f"[bold underline]Game Info[/]\n\nMode:  {mode_text}\nPhase: {self.phase}\nTurn:  {turn_text}\n"
+        )
         if self.mode == 1:
             status.append_text(Text.from_markup(f"Your side: {human_side}\n"))
         status.append(f"Moves played: {len(self.board.history)}\n\n")

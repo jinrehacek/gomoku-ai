@@ -71,7 +71,7 @@ def main() -> None:
             port=args.port,
             title="Gomoku",
             public_url=public_url,
-            default_font_size=11,
+            default_font_size=14,
         )
         server.serve()
         return

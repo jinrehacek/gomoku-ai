@@ -1,7 +1,6 @@
 import pytest
 import time
 from gomoku.board import Board
-import gomoku.engine as eng
 from gomoku.engine import (
     get_candidate_moves,
     _immediate_neighbors,
@@ -17,7 +16,6 @@ from gomoku.engine import (
     eval_board,
     minimax,
     get_best_move,
-    iterative_deepening,
     COMPLETE_PATTERNS,
     OPENING_DISTANCE,
     MOVES_TO_CONSIDER_DIST,
