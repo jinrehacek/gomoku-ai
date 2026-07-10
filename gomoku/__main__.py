@@ -61,7 +61,7 @@ def main() -> None:
         )
         if mode == 2:
             command += " --ai"
-            
+
         public_url = args.url if args.url else f"http://{args.host}:{args.port}"
         public_url = public_url.rstrip("/")
 
